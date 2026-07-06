@@ -10,7 +10,18 @@ import (
 	"strings"
 
 	"github.com/devrix/devrix/internal/layers/communication/capture/transcript"
+	"github.com/devrix/devrix/internal/shared/textutil"
 )
+
+// maxPriorSummaryPerTurnChars caps each turn's contribution to the prior-
+// output-summary block. The LLM's finalText for review-class tasks can be
+// 5-15K chars (mostly structured deliverable JSON), but injecting the
+// whole thing trains the next turn's LLM to mimic the same envelope even
+// when the user just asks "what should I read next" (DM-20260706-006).
+// 800 chars preserves the natural-language intent while suppressing
+// template mimicry. StripStructuredDeliverable is applied FIRST so the cap
+// measures meaningful text, not json dumps.
+const maxPriorSummaryPerTurnChars = 800
 
 // TranscriptReader reads recent final-text entries from a session's
 // transcript jsonl so the orchestrator can inject prior-output-summary
@@ -120,6 +131,17 @@ func readTranscriptFile(path string) ([]transcript.Event, error) {
 // IM card render, so this is safe to inject into the LLM prompt without
 // leaking to user-visible output).
 //
+// DM-20260706-006: each per-turn text is first run through
+//   - textutil.StripStructuredDeliverable (removes <deliverable_schema>,
+//     <findings_json>, etc. — the XML envelope markers)
+//   - textutil.StripFindingsJSONBlocks (removes ```json ...``` code blocks)
+//
+// and then truncated to maxPriorSummaryPerTurnChars. Without this
+// sanitization the LLM of turn N+1 mimics the previous turn's structured-
+// deliverable envelope even when the new user request is a casual
+// follow-up (e.g. "what should I read next?" gets answered with another
+// findings_json template).
+//
 // texts[0] = oldest of the kept slice, texts[len-1] = most recent.
 //
 // Output shape:
@@ -136,7 +158,13 @@ func (r *TranscriptReader) BuildPriorOutputSummary(texts []string) string {
 	var b strings.Builder
 	b.WriteString("<prior-output-summary>\n")
 	for i, t := range texts {
-		fmt.Fprintf(&b, "  [turn %d] %s\n", i+1, t)
+		cleaned := textutil.StripStructuredDeliverable(t)
+		cleaned = textutil.StripFindingsJSONBlocks(cleaned)
+		cleaned = strings.TrimSpace(cleaned)
+		if len(cleaned) > maxPriorSummaryPerTurnChars {
+			cleaned = cleaned[:maxPriorSummaryPerTurnChars] + "…"
+		}
+		fmt.Fprintf(&b, "  [turn %d] %s\n", i+1, cleaned)
 	}
 	b.WriteString("</prior-output-summary>")
 	return b.String()

@@ -116,6 +116,14 @@ type WorkItemPipelineRound struct {
 	RollupSynthRequested bool `json:"rollup_synth_requested,omitempty"`
 	// ObserveParseReject carries compact JSON for the next Observe user frame (DM-20260705-002).
 	ObserveParseReject string `json:"observe_parse_reject,omitempty"`
+	// SemanticRetryHint (DM-20260706-006) is set when the LLM semantic
+	// verifier returns VerdictFail with decision="retry". The hint is
+	// passed to the next round's ExecuteWorkItem via PriorVerifyReason
+	// so the LLM can self-correct ("the previous answer was template-
+	// mimicking; address the user's original question with concrete
+	// content"). Empty when the verifier agrees the answer passes
+	// or when decision="stop" (SpawnNone terminates the loop).
+	SemanticRetryHint string `json:"semantic_retry_hint,omitempty"`
 	// PlanParseReject carries compact JSON for the next Plan user frame (DM-20260705-002).
 	PlanParseReject string `json:"plan_parse_reject,omitempty"`
 	StructuredDeliverable *DeliverablePayload `json:"structured_deliverable,omitempty"`

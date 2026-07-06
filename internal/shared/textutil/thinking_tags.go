@@ -246,6 +246,78 @@ func StripAssistantInternalMarkers(text string) string {
 	return StripMiniMaxStreamMarkers(StripPriorOutputSummary(StripThinkingTags(text)))
 }
 
+// deliverableTagPairs is the set of structured-deliverable XML-style blocks
+// the LLM emits as machine-readable answer envelopes. These are valid in
+// the FINAL turn answer (the user sees them) but must NOT be carried into
+// the next turn's prior-context — the LLM will mimic the structure even
+// when the new user request is a casual follow-up question that has
+// nothing to do with the deliverable format (DM-20260706-006).
+//
+// Apply at the prior-summary injection boundary (TranscriptReader.
+// BuildPriorOutputSummary), NOT at the D1 IM boundary, because the user
+// still wants to see the structured deliverable in the final card.
+var deliverableTagPairs = []thinkTagPair{
+	{open: "<deliverable_schema>", close: "</deliverable_schema>"},
+	{open: "<deliverable_contract>", close: "</deliverable_contract>"},
+	{open: "<deliverable>", close: "</deliverable>"},
+	{open: "<findings_json>", close: "</findings_json>"},
+	{open: "<deliverable_json>", close: "</deliverable_json>"},
+	{open: "<p0_p1_file_line>", close: "</p0_p1_file_line>"},
+}
+
+// StripStructuredDeliverable removes the XML-style deliverable envelope
+// blocks (see deliverableTagPairs) from prior-context text. Plain markdown
+// ```json ...``` code blocks are kept (they may contain useful natural-
+// language content); only the explicit XML tags are stripped because
+// those are the structural markers the LLM is most likely to mimic.
+//
+// Unbalanced markers (open without close) drop everything from the open
+// tag onward — same fallback as StripPriorOutputSummary to avoid
+// pathological half-tag rendering.
+func StripStructuredDeliverable(text string) string {
+	out := text
+	for {
+		var (
+			earliestOpen  = -1
+			earliestPair  = -1
+			earliestOpenLen int
+		)
+		lower := strings.ToLower(out)
+		for i, tp := range deliverableTagPairs {
+			idx := strings.Index(lower, tp.open)
+			if idx >= 0 && (earliestOpen < 0 || idx < earliestOpen) {
+				earliestOpen = idx
+				earliestPair = i
+				earliestOpenLen = len(tp.open)
+			}
+		}
+		if earliestOpen < 0 {
+			return strings.TrimSpace(out)
+		}
+		rest := out[earliestOpen+earliestOpenLen:]
+		closeIdx, closeLen := findCaseInsensitive(rest, deliverableTagPairs[earliestPair].close)
+		var rebuilt string
+		if closeIdx < 0 {
+			rebuilt = strings.TrimSpace(out[:earliestOpen])
+		} else {
+			prefix := strings.TrimSpace(out[:earliestOpen])
+			suffix := strings.TrimSpace(rest[closeIdx+closeLen:])
+			switch {
+			case prefix == "":
+				rebuilt = suffix
+			case suffix == "":
+				rebuilt = prefix
+			default:
+				rebuilt = prefix + "\n" + suffix
+			}
+		}
+		if rebuilt == out {
+			return strings.TrimSpace(out)
+		}
+		out = rebuilt
+	}
+}
+
 func partialTagSuffix(raw, tag string) int {
 	if tag == "" || raw == "" {
 		return 0

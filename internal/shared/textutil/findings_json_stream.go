@@ -7,7 +7,11 @@ import (
 
 var (
 	findingsJSONMarkerRE = regexp.MustCompile(`(?i)"(?:findings|files_reviewed|scope)"\s*:`)
-	findingsJSONFenceRE  = regexp.MustCompile("(?is)```json\\s*.*?(?:```|$)")
+	// findingsJSONFenceRE matches both ```json ... ``` AND ```findings_json ... ```
+	// fences. DM-20260706-006: prior turns may emit either form depending on
+	// the LLM tier's prompt template — both should be stripped from the
+	// prior-output-summary so the next turn doesn't mimic the structure.
+	findingsJSONFenceRE = regexp.MustCompile("(?is)```(?:json|findings_json)\\s*.*?(?:```|$)")
 )
 
 // LooksLikeFindingsJSONStream reports whether a streaming chunk is likely raw

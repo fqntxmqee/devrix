@@ -413,6 +413,29 @@ func EmitAnomalyTrigger(ctx context.Context, sessionID, kind, severity, threshol
 	return func(err error) { endSpanWithError(span, err) }
 }
 
+// EmitSemanticConvergence wraps the DM-20260706-006 SemanticVerifier
+// invocation. Fires when ItemPipelineRunner consults the LLM with
+// "did this round actually answer the user's question?". Attributes
+// carry the LLM's verdict kind + confidence + reason so dashboards
+// can graph the convergence rate over time.
+//
+// DM-20260706-006: this span is the primary signal for "the LLM
+// detected template-mimicry and forced SpawnNone". A spike in this
+// span's rate is the leading indicator that user prompts need
+// clarification or the LLM tier is regressing.
+func EmitSemanticConvergence(ctx context.Context, sessionID, workItemID string, roundNo int, verdictKind string, confidence float64, reason string) func(error) {
+	attrs := []tracer.Attribute{
+		{Key: "session_id", Value: sessionID},
+		{Key: "work_item_id", Value: workItemID},
+		{Key: "round_no", Value: intToString(roundNo)},
+		{Key: "semantic.verdict_kind", Value: verdictKind},
+		{Key: "semantic.confidence", Value: floatToString(confidence)},
+		{Key: "semantic.reason", Value: reason},
+	}
+	_, span := start(ctx, telemetry.OpD7_S4_Semantic_Convergence, attrs...)
+	return func(err error) { endSpanWithError(span, err) }
+}
+
 // EmitLongTermReputationUpdate wraps BayesianUpdate in
 // mups/learn/reputation/store.go (T39). Both prior and posterior Beta
 // parameters are recorded so the trace shows the actual update delta;
