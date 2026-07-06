@@ -158,3 +158,115 @@ func TestUncertaintyReportSummary_FiltersLowStrengthUncertainty(t *testing.T) {
 		t.Fatalf("low-strength uncertainty should be filtered, got %q", got)
 	}
 }
+
+// DM-20260706-009: regression test for the 1+1=几? failure. Previously
+// ObsFact.statement was silently dropped from observation_summary, so a
+// high-strength fact ("1+1=2") wouldn't reach the Plan LLM. With the fix,
+// the statement must appear as `fact=...` so Plan knows the question is
+// already answered.
+func TestUncertaintyReportSummary_IncludesObsFactStatement(t *testing.T) {
+	fact, err := orchtypes.NewObservation(
+		orchtypes.ObsFact, orchtypes.CatBusiness, 0.99,
+		orchtypes.FactPayload{Statement: "在标准算术下，1+1=2。", Evidence: nil},
+		"observe_proposer",
+	)
+	if err != nil {
+		t.Fatalf("setup fact: %v", err)
+	}
+	rep, err := orchtypes.NewUncertaintyReport("sess_test", []orchtypes.Observation{fact})
+	if err != nil {
+		t.Fatalf("setup report: %v", err)
+	}
+	got := uncertaintyReportSummary(rep, "fast")
+	for _, want := range []string{"intent=fast", "fact=在标准算术下，1+1=2。"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("observation_summary missing %q:\n%s", want, got)
+		}
+	}
+}
+
+// DM-20260706-009: CatSystem ObsFact (e.g. routing metadata) should NOT
+// reach the Plan summary. Only CatBusiness facts change the Plan decision;
+// system facts are infrastructure noise from the Plan LLM's perspective.
+func TestUncertaintyReportSummary_FiltersSystemFact(t *testing.T) {
+	sysFact, err := orchtypes.NewObservation(
+		orchtypes.ObsFact, orchtypes.CatSystem, 0.99,
+		orchtypes.FactPayload{Statement: "D7 bootstrap active", Evidence: nil},
+		"observe_proposer",
+	)
+	if err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	rep, err := orchtypes.NewUncertaintyReport("sess_test", []orchtypes.Observation{sysFact})
+	if err != nil {
+		t.Fatalf("setup report: %v", err)
+	}
+	got := uncertaintyReportSummary(rep, "fast")
+	if strings.Contains(got, "D7 bootstrap") {
+		t.Fatalf("CatSystem fact should not surface in Plan summary, got %q", got)
+	}
+}
+
+// DM-20260706-009: long ObsFact.statement must be truncated to fit
+// uncertaintyQuestionMaxLen (120 chars), matching the ObsUncertainty /
+// ObsDeviation treatment.
+func TestUncertaintyReportSummary_TruncatesLongFact(t *testing.T) {
+	long := strings.Repeat("y", 200)
+	fact, err := orchtypes.NewObservation(
+		orchtypes.ObsFact, orchtypes.CatBusiness, 0.95,
+		orchtypes.FactPayload{Statement: long, Evidence: nil},
+		"observe_proposer",
+	)
+	if err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	rep, err := orchtypes.NewUncertaintyReport("sess_test", []orchtypes.Observation{fact})
+	if err != nil {
+		t.Fatalf("setup report: %v", err)
+	}
+	got := uncertaintyReportSummary(rep, "")
+	if strings.Contains(got, long) {
+		t.Fatalf("fact not truncated; got len=%d", len(got))
+	}
+	if !strings.Contains(got, "fact=") {
+		t.Fatalf("expected fact= prefix, got %q", got)
+	}
+}
+
+// DM-20260706-009: hasHighStrengthFact helper used by the Plan single-mode
+// gate. Threshold semantics: ≥ threshold (inclusive). CatSystem ObsFact is
+// never high-strength (filtered out).
+func TestHasHighStrengthFact(t *testing.T) {
+	bizFact, _ := orchtypes.NewObservation(
+		orchtypes.ObsFact, orchtypes.CatBusiness, 0.99,
+		orchtypes.FactPayload{Statement: "1+1=2"},
+		"observe_proposer",
+	)
+	sysFact, _ := orchtypes.NewObservation(
+		orchtypes.ObsFact, orchtypes.CatSystem, 0.99,
+		orchtypes.FactPayload{Statement: "sys"},
+		"observe_proposer",
+	)
+	weakBizFact, _ := orchtypes.NewObservation(
+		orchtypes.ObsFact, orchtypes.CatBusiness, 0.5,
+		orchtypes.FactPayload{Statement: "weak"},
+		"observe_proposer",
+	)
+	repBiz, _ := orchtypes.NewUncertaintyReport("sess", []orchtypes.Observation{bizFact})
+	repSys, _ := orchtypes.NewUncertaintyReport("sess", []orchtypes.Observation{sysFact})
+	repWeak, _ := orchtypes.NewUncertaintyReport("sess", []orchtypes.Observation{weakBizFact})
+	repEmpty, _ := orchtypes.NewUncertaintyReport("sess", nil)
+
+	if !hasHighStrengthFact(repBiz, 0.9) {
+		t.Fatalf("CatBusiness ObsFact @0.99 should be high-strength, got false")
+	}
+	if hasHighStrengthFact(repSys, 0.9) {
+		t.Fatalf("CatSystem ObsFact must not trigger fast-path, got true")
+	}
+	if hasHighStrengthFact(repWeak, 0.9) {
+		t.Fatalf("CatBusiness ObsFact @0.5 below threshold must not trigger fast-path")
+	}
+	if hasHighStrengthFact(repEmpty, 0.9) {
+		t.Fatalf("empty report must not trigger fast-path")
+	}
+}

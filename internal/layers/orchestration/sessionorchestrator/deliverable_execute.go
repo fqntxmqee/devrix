@@ -109,20 +109,25 @@ func AppendDeliverableExecuteHint(directive string, schema workmodel.Deliverable
 }
 
 // uncertaintyReportSummary builds the Plan-side observation_summary from the
-// Observe-phase UncertaintyReport. DM-20260706-007: previously this only
-// counted anomalies (numeric), forcing Plan to guess at the scope when
-// Observe emitted a high-strength ObsUncertainty (e.g. "d7 领域路径未知").
-// Now the function serializes ObsUncertainty questions and ObsDeviation
-// statements inline so the Plan LLM can consume them as data, not guesses.
+// Observe-phase UncertaintyReport.
 //
-// We scan `report.Observations` (NOT report.Anomalies) because the LLM-driven
+// History:
+//   - DM-20260706-007: serialized ObsUncertainty/ObsDeviation inline so Plan
+//     could see high-strength questions and deviations instead of guessing.
+//   - DM-20260706-009: added ObsFact branch. Previously ObsFact.statement was
+//     dropped, which meant a high-confidence fact (e.g. "1+1=2") would only
+//     show up as `intent=fast` in the Plan frame. Plan LLM had no way to know
+//     the question was already answered, so it would decompose into 2 child
+//     specs and route through Execute+bash tool, blowing up trivial Q&A.
+//
+// We scan `report.Observations` (NOT report.Anomalies) because LLM-driven
 // ObsUncertainty entries are CatBusiness and live in BusinessObservations —
 // not in Anomalies. Filtering by Kind + a minimum strength floor avoids
 // flooding the Plan frame with weak signals.
 //
 // Format (semicolon-joined, identical to the prior contract so the Plan
 // prompt parser stays unchanged):
-//   intent=<kind>; q=<truncated question>; dev=<statement>; ...
+//   intent=<kind>; fact=<truncated statement>; q=<truncated question>; dev=<statement>; ...
 //
 // intent is always emitted first when present. Empty input → empty string
 // (preserves the prior "all blank" fast path).
@@ -133,6 +138,18 @@ func uncertaintyReportSummary(report orchtypes.UncertaintyReport, intentKind str
 	}
 	for _, o := range report.Observations {
 		switch o.Kind {
+		case orchtypes.ObsFact:
+			// DM-20260706-009: high-strength facts MUST reach the Plan LLM
+			// verbatim so it knows the question is already answered (no need
+			// to decompose + execute + bash echo). We only surface CatBusiness
+			// facts; system-level facts (e.g. "D7 bootstrap active") are
+			// routing metadata the Plan shouldn't branch on.
+			if o.Category != orchtypes.CatBusiness {
+				continue
+			}
+			if s := extractObservationStatement(o); s != "" {
+				parts = append(parts, "fact="+truncateForSummary(s, uncertaintyQuestionMaxLen))
+			}
 		case orchtypes.ObsUncertainty:
 			// Skip low-strength uncertainty noise; only surface questions
 			// that meaningfully change the Plan decision (matches the
@@ -151,6 +168,19 @@ func uncertaintyReportSummary(report orchtypes.UncertaintyReport, intentKind str
 		}
 	}
 	return strings.Join(parts, "; ")
+}
+
+// hasHighStrengthFact reports whether the report carries a CatBusiness
+// ObsFact with strength ≥ threshold. Used by the Plan single-mode gate to
+// detect "question already answered" cases (DM-20260706-009) so trivial Q&A
+// like "1+1=几?" doesn't get force-decomposed.
+func hasHighStrengthFact(report orchtypes.UncertaintyReport, threshold float64) bool {
+	for _, o := range report.Observations {
+		if o.Kind == orchtypes.ObsFact && o.Category == orchtypes.CatBusiness && o.Strength >= threshold {
+			return true
+		}
+	}
+	return false
 }
 
 // extractObservationQuestion reads UncertaintyPayload.Question regardless

@@ -260,6 +260,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 			ParentScopeIn:   parentScopeIn,
 			UncertaintyMean: item.Uncertainty,
 			PriorParseReject: priorPlanReject,
+			Report:          report,
 		})
 		if propErr == nil && prop != nil {
 			strategic = prop
