@@ -237,6 +237,25 @@ func (e *DefaultWorkItemExecutor) ExecuteWorkItem(ctx context.Context, sessionID
 		}}
 	}
 
+	// DM-20260706-002 (devrix-d7-frame-delta-phase1-prod-emit) hotfix:
+	// D7 Phase 1 FrameDelta binder for ExecuteWorkItem. ItemPipelineRunner
+	// (item_pipeline.go:376) already binds StrategicPlanProposal → FrameDelta
+	// onto ec.PlanFrameDelta and InjectPlanFrameDelta is well-tested + emits
+	// the D7.S9.Execute.PlanFrameDelta.Inject hardening span — but until this
+	// hotfix no production code path actually READ ec.PlanFrameDelta nor
+	// called InjectPlanFrameDelta, so the span stayed at 0 in production even
+	// when Plan LLM output declared ExecutionMode / ChildSpecs /
+	// DeliverableContract (verified via Jaeger trace cf29aeaaa602f736 on
+	// 2026-07-06, 2-hour window 0 spans vs Phase 3 2 spans). InjectPlanFrameDelta
+	// is nil-safe: planDelta.IsZero() short-circuit emits
+	// PlanFrameDeltaInjectEmpty and returns baseline. Idempotent across
+	// sub-turns because ec.PlanFrameDelta is bound once per round (RoundPhasePlan).
+	var planDelta interfaces.FrameDelta
+	if ec, ok := WorkItemExecContextFrom(ctx); ok && ec.PlanFrameDelta != nil {
+		planDelta = *ec.PlanFrameDelta
+	}
+	systemPrompt = InjectPlanFrameDelta(ctx, sessionID, planDelta, systemPrompt)
+
 	max := e.maxIters()
 	if ec, ok := WorkItemExecContextFrom(ctx); ok && ec.MaxItersOverride > 0 {
 		max = ec.MaxItersOverride
