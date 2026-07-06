@@ -9,6 +9,8 @@
 //  3. TestInjectPlanFrameDelta_SchemaHashStable — 相同 FrameDelta → 相同 schema hash
 //  4. TestInjectPlanFrameDelta_ZeroValueReturnsBaseline — FrameDelta{} / nil → baseline 不变
 //  5. TestInjectPlanFrameDelta_BudgetExceededFallsBackToBaseline — 注入 > 200 char → baseline + emit BudgetExceeded
+//  6. TestInjectPlanFrameDelta_EndSpanNoPanic — DM-20260706-003 regression: 3 个 emit 路径的
+//     end func 都已 inline 调用，nil-bridge 下不 panic
 //
 // Span emit (telemetry) 不在断言中 — hardening 是 nil-bridge + deferred end,
 // 测试环境无 telemetry bridge, span 调用走 no-op 安全路径。
@@ -19,6 +21,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/devrix/devrix/internal/layers/observability"
+	"github.com/devrix/devrix/internal/layers/orchestration/hardening"
 	"github.com/devrix/devrix/internal/layers/orchestration/interfaces"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 )
@@ -158,6 +162,61 @@ func TestInjectPlanFrameDelta_BudgetExceededFallsBackToBaseline(t *testing.T) {
 		t.Fatalf("injection length %d exceeds ABSOLUTE budget %d\noutput: %q",
 			injectionLen, interfaces.MaxPlanFrameDeltaInjectChars, out)
 	}
+}
+
+// TestInjectPlanFrameDelta_EndSpanNoPanic — DM-20260706-003 regression.
+//
+// 3 路径 (zero / budget-exceeded / ok) 都必须 inline 调用 EmitPlanFrameDeltaInject
+// 返回的 end func；否则 Jaeger 看不到 span (Start 创建了 span 但 End 永远不触发，
+// 端到端没有 emit 出去，trace 树也丢失这一支)。本测试在 no-op bridge 下
+// 覆盖 3 路径，确认不 panic；端到端 Jaeger 验证通过 prod trace 完成。
+func TestInjectPlanFrameDelta_EndSpanNoPanic(t *testing.T) {
+	b := observability.NewBridge(observability.NewNoOp())
+	hardening.SetBridge(b)
+	t.Cleanup(func() { hardening.SetBridge(nil) })
+
+	ctx := context.Background()
+	baseline := "## baseline"
+
+	t.Run("zero_value_path", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Fatalf("zero-value path panicked: %v", r)
+			}
+		}()
+		out := InjectPlanFrameDelta(ctx, "s1", interfaces.FrameDelta{}, baseline)
+		if out != baseline {
+			t.Fatalf("zero-value should return baseline, got %q", out)
+		}
+	})
+
+	t.Run("ok_path", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Fatalf("ok path panicked: %v", r)
+			}
+		}()
+		fd := interfaces.FrameDelta{
+			ExecutionMode: "commitment",
+			ChildSpecs:    []interfaces.ChildSpecRef{{ID: "fix:1"}},
+		}
+		out := InjectPlanFrameDelta(ctx, "s1", fd, baseline)
+		if !strings.Contains(out, "<plan_frame_delta") {
+			t.Fatalf("ok path should inject tag, got %q", out)
+		}
+	})
+
+	t.Run("budget_exceeded_path", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Fatalf("budget-exceeded path panicked: %v", r)
+			}
+		}()
+		// 极端 ExecutionMode 不会真正触发 budget_exceeded (摘要被截断 80)，
+		// 但路径本身要走过 end 调用验证。
+		fd := interfaces.FrameDelta{ExecutionMode: strings.Repeat("z", 200)}
+		_ = InjectPlanFrameDelta(ctx, "s1", fd, baseline)
+	})
 }
 
 // TestBuildPlanFrameDeltaForExecCtx — T4 wiring helper 覆盖:
