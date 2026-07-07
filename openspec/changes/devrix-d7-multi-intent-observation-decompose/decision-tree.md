@@ -5,6 +5,8 @@
 
 > 本文档是 `proposal.md §5 Solution` 的展开版,描述 Observe 节点在 5 个典型场景下的完整执行流程,以及"直接 return vs 转发 Plan 节点"的硬规则。S3-Gate 时与 proposal + design + tasks 一起 review。
 
+> **⚠️ 2026-07-07 事实校准**:本文档中提到的 `SpawnPolicy` 5 值联合(`InlineRetry / SpawnChild / SpawnEscalateHuman / DecomposeIntoChildren / DecomposeByIntentSegments`)**与代码事实不符**。实际 `SpawnPolicy` 是 `workmodel/pipeline_round.go:27-34` 的 3 值字符串枚举(`SpawnNone / SpawnDecompose / SpawnInline`),由 D7 Convergence Contract CC-1.1~CC-1.5 锚定,不可改。本 Change 改为方案 β:`Plan` 加 2 可选字段(`IntentSegmentSet + DAG`)承载 multi-intent 语义,SpawnPolicy 完全不动。本文档中遗留的 5 值联合描述仅作"原方案 α 的旧描述",不作为实施依据。**Single-Layer Scope Banner**:6 节点流水线 (Observe/Plan/Execute/Verify/Decision/Learn) 是 **WorkTree 的单层 inner-loop**,跨层递归(`MaxDecomposeDepth = 3`)走 v2 多层 worktree 协议。
+
 ---
 
 ## 1. 决策矩阵(5 场景 × 7 维度)

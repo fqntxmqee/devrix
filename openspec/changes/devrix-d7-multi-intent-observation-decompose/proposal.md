@@ -3,7 +3,7 @@
 **Change ID:** `devrix-d7-multi-intent-observation-decompose`
 **Demand ID:** DM-20260707-001
 **Priority:** P0
-**PR Count:** 4 (PR-A grammar/SpawnPolicy · PR-B DAG executor · PR-C streaming emit · PR-D gating+e2e)
+**PR Count:** 7 (PR-A1 grammar/Plan fields · PR-A2 AC contract + LLM IO · PR-B DAG executor · PR-C streaming emit · PR-D gating+e2e · PR-E Learn+22-scenario · PR-F Plan+26-scenario)
 **Status:** S2_Proposal → S3_Design → S4_Implemented → S5_Accepted → S6_Delivered → S7_Archived
 
 ---
@@ -108,9 +108,11 @@ DM-20260706-011 只解决了**单意图确定性 Q&A** 的 fast-return,**多意�
 
 **回滚成本**:Medium。PlanDAG 是 plan.Plan 的 superset,旧 Plan 路径保留为 fallback;`cfg d7.dag_executor.enabled = true/false` 是 feature flag,可以黑/白切换;数据无迁移。
 
-### 方案 B(备选):Plan 节点现有 SpawnPolicy + Execute 节点 hardcode 并行
+### 方案 B(已弃用,S3-Gate 后校准):Plan 节点"现有 SpawnPolicy.DecomposeIntoChildren" + Execute 节点 hardcode 并行
 
-**核心思路**:不动 Plan 类型,Plan 节点继续产出 Plan(已含 SpawnPolicy.DecomposeIntoChildren)。Execute 节点扫描 Plan.SpawnPolicy,如果 Decompose 就 hardcode 串行触发 children(不是真并行,本质是顺序 await)。
+> **2026-07-07 事实校准**:本方案假定的"现有 SpawnPolicy.DecomposeIntoChildren"**不存在**。`SpawnPolicy` 实际是 `workmodel/pipeline_round.go:27-34` 的 3 值字符串枚举,`DecomposeIntoChildren` 不是其值。S3-Gate review 时此方案实际已被证伪,新方案 β(Plan 加 2 可选字段)取代。保留方案 B 仅作历史对照,无须实施。
+
+**核心思路(已废)**:不动 Plan 类型,Plan 节点继续产出 Plan。Execute 节点扫描 Plan.SpawnPolicy,如果 Decompose 就 hardcode 串行触发 children(不是真并行,本质是顺序 await)。
 
 **影响范围**:小,~600 行。
 
@@ -128,13 +130,15 @@ A 才是真正的"Plan 出 DAG + Execute 并行执行"。B 是 hack,只解决了
 
 #### 决策矩阵
 
-| 场景 | segment 数 | 确定性 | 不确定性 | Plan 调用 | Execute 调用 | stream emit | 总延迟 |
+| 场景 | segment 数 | 确定性 | 不确定性 | Plan 字段 | Execute 调用 | stream emit | 总延迟 |
 |---|---|---|---|---|---|---|---|
-| **S-A 单确定性** | 1 | 1 | 0 | ❌ 跳过 | ❌ 跳过 | 1 final | ~1s |
-| **S-B 单不确定性** | 1 | 0 | 1 | ✅ InlineRetry | ✅ 单 Worker 串行 | 1 final | ~4s |
-| **S-C 多确定性** | N≥2 | N | 0 | ❌ 跳过 | ❌ 跳过 | 1 merged final | ~1s |
-| **S-D 多不确定性** | N≥2 | 0 | N | ✅ PlanDAG | ✅ RunPlanDAG 并行 | 1 rollup final | ~5s |
-| **S-E 混合** | N≥2 | ≥1 | ≥1 | ✅ PlanDAG | ✅ RunPlanDAG 混合 | N partial + 1 final | ~0.5s 看到快答,~5s 最终 |
+| **S-A 单确定性** | 1 | 1 | 0 | ❌ 跳过(IntentSegmentSet/DAG 全 nil) | ❌ 跳过 → fast-path emit | 1 final | ~1s |
+| **S-B 单不确定性** | 1 | 0 | 1 | ✅ Plan 4-channel(IntentSegmentSet/DAG 全 nil) | ✅ 单 Worker 串行 | 1 final | ~4s |
+| **S-C 多确定性** | N≥2 | N | 0 | ❌ 跳过(maybeObservationalAnswerMulti) | ❌ 跳过 → fast-path emit 合并 | 1 merged final | ~1s |
+| **S-D 多不确定性** | N≥2 | 0 | N | ✅ Plan(IntentSegmentSet + DAG) | ✅ RunPlanDAG 4 worker 并行 | 1 rollup final | ~5s |
+| **S-E 混合** | N≥2 | ≥1 | ≥1 | ✅ Plan(IntentSegmentSet + DAG) | ✅ RunPlanDAG 混合(fast-path segment 子段 + verified 子段) | N partial + 1 final | ~0.5s 看到快答,~5s 最终 |
+
+> **说明**:Plan 字段 = `Plan.IntentSegmentSet` + `Plan.DAG`(方案 β,2026-07-07 拍板)。SpawnPolicy 保持现有 3 值(`SpawnNone/SpawnDecompose/SpawnInline`)不变。
 
 #### 5 场景一句话摘要
 
@@ -154,10 +158,12 @@ A 才是真正的"Plan 出 DAG + Execute 并行执行"。B 是 hack,只解决了
 ✅ r.Learner != nil
 ```
 
-否则降级 → 整个 directive 进 Plan 节点;Plan 节点根据 segment 数决定 SpawnPolicy:
-- `len(Segments) == 1 && all deterministic` 触发 fast-path(S-A/S-C)
-- `len(Segments) >= 2` 触发 `DecomposeByIntentSegments` → PlanDAG(S-D/S-E)
-- `len(Segments) == 1 && uncertain` 触发旧 `DecomposeIntoChildren`(S-B 后向兼容)
+否则降级 → 整个 directive 进 Plan 节点;Plan 节点根据 segment 数决定 **Plan 字段**(方案 β,2026-07-07 拍板):
+- `len(Segments) == 1 && all deterministic` 触发 fast-path(S-A/S-C) → **Plan.IntentSegmentSet/DAG 都 nil,走 4-channel 路径**
+- `len(Segments) >= 2` 触发 multi-intent 路径 → **Plan 写入 IntentSegmentSet + DAG**(S-D/S-E)
+- `len(Segments) == 1 && uncertain` 触发旧 4-channel 路径(S-B 后向兼容,**SpawnPolicy 不变,Plan 字段全 nil**)
+
+> **事实校准(S3-Gate 后 2026-07-07 拍板)**:`SpawnPolicy` 是 `workmodel/pipeline_round.go:27-34` 的 3 值字符串枚举,由 D7 Convergence Contract CC-1.1~CC-1.5 锚定,**不可改**。multi-intent 语义全部由 `Plan.IntentSegmentSet` + `Plan.DAG` 承载,SpawnPolicy 完全不动。
 
 #### 关键设计决策
 
@@ -561,7 +567,7 @@ Verify (节点 4) + Decision (节点 5) 两个独立 stage
 |------|--------|---------|
 | 基础 5 场景 (P22-P26) | 5 | happy path,正常 6 节点流水线 |
 | Plan LLM 错误 (P1-P3) | 3 | **Decision 新增 plan_error 路径**(10 行 → 11 行映射表)+ ItemPipelineRunner emit abort + NO Learn |
-| 字段异常 (P4-P11) | 8 | **重试 Plan LLM ≤ 2 次**(§9 feedback_loop 3 子类)+ **降级旧 SpawnPolicy.DecomposeIntoChildren**(无 AC) |
+| 字段异常 (P4-P11) | 8 | **重试 Plan LLM ≤ 2 次**(§9 feedback_loop 3 子类)+ **降级到原 4-channel Plan 路径**(Plan.IntentSegmentSet/DAG 全 nil,PlanKind 决定 channel) |
 | Parse Reject (P12-P17) | 6 | 同 P4-P11 重试 + 降级 |
 | fast-path 命中 (P18-P19) | 2 | Plan 节点 short-circuit,NO Execute / NO Decision |
 | force_plan (P20-P21) | 2 | Plan prompt 注入 "强制 Required AC[] ≥ 1" + PriorityHint,Execute/Decision/Learn 与默认 Plan 一致 |
@@ -572,7 +578,7 @@ Verify (节点 4) + Decision (节点 5) 两个独立 stage
 | 决策点 | 推荐策略 | 理由 |
 |--------|---------|------|
 | **Plan LLM 错误处理** | ItemPipelineRunner 直接 emit abort + Decision plan_error 新路径 | Plan error 无 segment row,与 Learn §5.6.1 决策一致(Plan 错误不 Learn) |
-| **Parse Reject 重试与降级** | 重试 Plan LLM ≤ 2 次 + 降级旧 SpawnPolicy.DecomposeIntoChildren | 重试给 LLM 修正机会,降级保 happy path 完整性 |
+| **Parse Reject 重试与降级** | 重试 Plan LLM ≤ 2 次 + 降级到原 4-channel Plan 路径(IntentSegmentSet/DAG 全 nil) | 重试给 LLM 修正机会,降级保 happy path 完整性 |
 | **force_plan Plan 差异** | 强制 Required AC[] ≥ 1 + PriorityHint 注入 prompt | 防止下次又走 fast-path,Plan 路径保持一致 |
 | **S-E Decision 边界** | fast-path 部分跳过 Decision,parent rollup 统一决策 A accept | 保持 fast-path 优势,parent rollup 提供决策完整性 |
 
@@ -601,23 +607,23 @@ Verify (节点 4) + Decision (节点 5) 两个独立 stage
 
 | 字段异常类型 | PlanAcceptanceContractBuilder.Build | 重试 | 降级路径 |
 |------------|-------------------------------------|------|---------|
-| **P4** 空 Children | 拒绝(ParseReject) | ≤ 2 次重试 Plan LLM + feedback CompactJSON | 降级旧 SpawnPolicy.DecomposeIntoChildren(NO Execute) |
-| **P5** Children + 空 DAG | 通过(降级路径) | 0 次(直接降级) | 顺序串行 Execute + fallback NumericRange Verify |
+| **P4** Plan.IntentSegmentSet = nil 但 DAG 非空(或反过来,字段不对称) | 拒绝(ParseReject) | ≤ 2 次重试 Plan LLM + feedback CompactJSON | 降级到原 4-channel 路径(Plan.IntentSegmentSet/DAG 全 nil) + PlanAcceptanceContractBuilder.Build 返回 ErrPlanFieldAsymmetry |
+| **P5** PriorityHint 提示但 PlanKind ≠ Scenario/Exploration | 通过(降级路径) | 0 次(直接降级) | 走原 PlanKind 通道 + fallback NumericRange Verify |
 | **P6** DAG 0 nodes | 拒绝(ParseReject) | ≤ 2 次 + 降级 | 降级同 P4 |
 | **P7** AC[] CheckKind 越界 | 拒绝(ParseReject) | ≤ 2 次 + 降级 | 降级同 P5 |
 | **P8** AC[] Required=0 | 拒绝(ParseReject) | ≤ 2 次 + 降级 | 降级同 P5 |
 | **P9** rationale 缺失 | **通过**(可选字段) | 0 次 | 正常路径(Execute/Decision/Learn 不变)+ Learn metadata 缺 rationale 字段 + audit log 警告 |
 | **P10** priorities 越界 | 拒绝(ParseReject) | ≤ 2 次 + 降级 | 降级同 P5 |
 | **P11** segments ID 缺失/重复 | 拒绝(ParseReject) | ≤ 2 次 + 降级 | 降级同 P5 |
-| **P12-P17** 6 类 Parse Reject | 拒绝(ParseReject) | ≤ 2 次 + 降级 | 降级同 P5 |
+| **P12-P17** 6 类 Parse Reject(RepeatCycle / TooManyNodes / AC 重复 ID / DAG 边端点缺失 / node 重复 ID / 优先级映射缺失) | 拒绝(ParseReject) | ≤ 2 次 + 降级 | 降级同 P5 |
 
 **重试上限 ≤ 2 次的依据**:与 spec_delta §9 feedback_loop 3 子类(RejectCycle / RejectTooManyNodes / RejectACDuplicateID)的重试上限一致,避免 LLM 循环死锁。
 
-**降级路径(旧 SpawnPolicy.DecomposeIntoChildren)**:
-- Execute:按 Children 顺序串行(无并行,无 priority queue)
-- Verify:跳过 PerCriterion,只跑 fallback NumericRange 检查(基于 artifact 内容长度 + 关键词)
-- Decision:走简化 Decision A accept(无 AC,VerdictKind 由 fallback Verify 给出)
-- Learn:正常 Learn α++,SourceID 加前缀 `plan_legacy:seg_a_id` 区分
+**降级路径(原 4-channel Plan 路径)**:
+- Execute:按 PlanKind 路由到 4 个 channel 之一(Commit / Protocol / Scenario / Exploration);Plan 字段(IntentSegmentSet/DAG)全 nil
+- Verify:跳过 PerCriterion,只跑 fallback NumericRange 检查(基于 artifact 内容长度 + 关键词,Phase 4 已实现)
+- Decision:走简化 Decision A accept(无 AC[],VerdictKind 由 fallback Verify 给出,Phase 4 已实现)
+- Learn:正常 Learn α++,SourceID 加前缀 `plan_legacy:seg_a_id` 区分(plan 降级路径标记)
 
 #### 决策 3:force_plan Plan 路径差异(P20-P21)
 
@@ -671,7 +677,7 @@ Verify (节点 4) + Decision (节点 5) 两个独立 stage
 | Stream emit 重复发卡 | Medium | High(用户看到重复卡片) | idempotency key (session_id, segment_id) + InMemoryEmitDedup |
 | 并发 4 worker 抢占同一 SessionWorkItem 状态 | Medium | High(并发写冲突) | WorkItem state 加 RWMutex;child 独立锁粒度 = WorkItemID |
 | Reputation per-segment 累积噪声 | Low | Low(Low statistical signal) | v1 不修;v2 加 BayesianHierarchical pooling segment α/β |
-| Plan LLM 不返回 DAG 字段 | High(v1 早期) | Medium(降级到旧 Plan) | spawn_policy == DecomposeIntoChildren + 不带 DAG → 降级旧 PlanDAGExecError;rollout 后逐步收紧降级路径 |
+| Plan LLM 不返回 DAG 字段 | High(v1 早期) | Medium(降级到原 4-channel Plan) | `Plan.DAG == nil` && `Plan.IntentSegmentSet != nil` → 触发 PlanLLMOutputInvalidJSON;→ Decision plan_error 第 11 行映射 → emit abort + NO Learn;降级路径:Plan.DAG 与 Plan.IntentSegmentSet 同时为 nil(走原 Phase 2 PR-B1 4-channel 路径) |
 | Stream emit partial 顺序与 parent 最终答案不一致 | Medium | Medium(用户困惑) | parent rollup LockFlag(等所有 partial 确认 ack)再 emit 最终 |
 | OpenSpec lite-mode delta 太大 | Low | Low | 复用 DM-20260630-003 lite-mode pattern, spec_delta 控制在 ≤ 200 行 |
 
@@ -679,10 +685,10 @@ Verify (节点 4) + Decision (节点 5) 两个独立 stage
 
 ## 7. Rollout
 
-- **PR 拆分**:4 PR(PR-A grammar/SpawnPolicy + IntentSegmenter + PlanDAG type + DAG validator;PR-B WaveScheduler DAG executor + 4 worker pool;PR-C streaming emit + idempotency;PR-D config flag + e2e LP-3 test + verify-archive)
+- **PR 拆分**:7 PR(PR-A1 grammar/Plan fields + IntentSegment + PlanDAG type + DAG validator;PR-A2 AC contract + LLM IO 合并;PR-B WaveScheduler DAG executor + 4 worker pool;PR-C streaming emit + idempotency;PR-D config flag + e2e LP-3+LP-4 test + verify-archive;PR-E Learn+22 场景;PR-F Plan+26 场景)
 - **Feature flag**:`devrix.d7.dag_executor.enabled`(bool,默认 off → first 5% → 100% across 2 weeks)
 - **数据迁移**:无
-- **回滚预案**:feature flag off → 自动 fallback 到旧 Plan 路径(`SpawnPolicy.DecomposeIntoChildren` + 顺序 await);reputation 数据无迁移成本
+- **回滚预案**:feature flag off → 自动 fallback 到原 Phase 2 PR-B1 Plan 路径(`Plan.IntentSegmentSet/DAG` 全 nil → 4-channel);reputation 数据无迁移成本
 - **灰度策略**:内部 feishu → DM 群 → 5% 用户随机 → 100%
 
 ---
@@ -693,7 +699,7 @@ Verify (节点 4) + Decision (节点 5) 两个独立 stage
 
 | # | 问题 | 决策选项 | 解决线索 |
 |---|------|----------|----------|
-| 1 | IntentSegment 切分失败时(LLM 返回模糊边界)如何降级? | A) 切 1 个 child(整个 directive 当 1 segment);B) 让 Observe LLM 重试 1 次;C) Plan 节点 fallback 旧 SpawnPolicy | A 简单,无重试延迟;B 体验更准;**倾向 A**(v1 简化)+ 观测指标驱动 v2 |
+| 1 | IntentSegment 切分失败时(LLM 返回模糊边界)如何降级? | A) 切 1 个 IntentSegment(整个 directive 当 1 segment);B) 让 Observe LLM 重试 1 次;C) Plan 节点 fallback 原 4-channel Plan(IntentSegmentSet/DAG 全 nil) | A 简单,无重试延迟;B 体验更准;**倾向 A**(v1 简化)+ 观测指标驱动 v2 |
 | 2 | validateDAG() 拒绝后 Plan LLM 看到的错误 feedback 如何格式化才不循环? | A) 纯人类可读文本;B) 机器可读 JSON enum + LLM 友好解释混合 | spec_delta §9 feedback_loop 已定义 3 子类,**倾向 B**(JSON + 解释)避免循环 |
 | 3 | WaveScheduler 4-worker pool 是 fixed 还是 lazy spawn? | A) fixed 4 永久占用;B) lazy 按 ready 节点数动态 fork | A 简单无 lifecycle 问题;B 资源省但要处理 fork/join;**v1 倾向 A fixed**(spec_delta §6 硬上限 4)+ v2 metrics-driven 自适应 |
 | 4 | parent rollup 的 idempotency key 与普通 segment 共享 dedup 表吗? | A) 共享 dedup 表,B 区分;B) 用不同前缀(如 "rollup:" / "seg:")物理隔离 | A 简单但有概率误命中;B 更安全但要双份 dedup;**倾向 B**(不同 keyspace)+ spec_delta §7 适配 |

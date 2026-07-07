@@ -7,17 +7,19 @@
 
 ---
 
-## P0-1 IntentSegment grammar + SpawnPolicy 扩展
+## P0-1 IntentSegment grammar + Plan 字段扩展(方案 β,2026-07-07 拍板)
 
-**File:** `internal/layers/orchestration/orchtypes/intent_segment.go` + `internal/layers/orchestration/plan/spawn_policy.go`
-**Effort:** 1.5 人天
+> **事实校准(S3-Gate 后 2026-07-07 拍板)**:原方案α"扩展 `plan.SpawnPolicy`" 基于**不存在的 `plan/spawn_policy.go`**。实际 `SpawnPolicy` 在 `workmodel/pipeline_round.go:27-34`,为 3 值字符串枚举(`SpawnNone / SpawnDecompose / SpawnInline`),由 D7 Convergence Contract CC-1.1~CC-1.5 锚定,**不可改**。改用方案 β:`Plan` 加 2 可选字段(`IntentSegmentSet` + `PlanDAG`)承载 multi-intent 语义,SpawnPolicy 完全不动。
+
+**File:** `internal/layers/orchestration/orchtypes/intent_segment.go` + `internal/layers/orchestration/plan/plan_struct.go` + `internal/layers/orchestration/plan/plan_dag.go`
+**Effort:** 1.2 人天
 **AC:** AC1-AC3 (新增)
 
 | ID | Description | Status |
 |---|---|---|
 | T01 | 新增 `IntentSegment {ID, Text, IntentKind, Priority, Confidence}` 类型 + JSON schema | TODO |
 | T02 | 新增 `IntentSegmentSet {Segments []IntentSegment, SourceDirective, DetectedAt}` 容器 | TODO |
-| T03 | 扩展 `plan.SpawnPolicy` 加 `DecomposeByIntentSegments IntentSegmentSet` 变体 | TODO |
+| T03 | **方案 β 修订**:扩 `plan.Plan` 加 2 个可选字段:`IntentSegmentSet *orchtypes.IntentSegmentSet` + `DAG *PlanDAG`(两个 nil 时退化为现有 4-channel 路径;任一非 nil 触发 multi-intent 路径) | TODO |
 | T04 | `NewIntentSegment(orchtypes.IntentSegment)` + `Validate(...)` 含 (kind ∈ {Deterministic, Explore, Commit, Analyze}) + Priority ∈ [0, 100] | TODO |
 
 ## P0-2 IntentSegmenter (Observe 节点 LLM 切分)

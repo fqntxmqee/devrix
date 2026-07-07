@@ -239,20 +239,30 @@ aggregation_rule: |
 
 ---
 
-## 4. Updated: SpawnPolicy
+## 4. Updated: Plan (字段扩展,方案 β,2026-07-07 拍板)
+
+> **事实校准(S3-Gate 后 2026-07-07 拍板)**:原方案假设扩展 `SpawnPolicy` 枚举(增加 `DecomposeByIntentSegments`)。实际 `SpawnPolicy` 是 `workmodel/pipeline_round.go:27-34` 的 3 值字符串枚举(`SpawnNone / SpawnDecompose / SpawnInline`),由 D7 Convergence Contract CC-1.1~CC-1.5 锚定,**不可改**。multi-intent 语义改由 `Plan` 加 2 可选字段承载。
 
 ```yaml
-name: SpawnPolicy
+name: Plan
 delta: |
-  现有 SpawnPolicy 枚举值:
-    - InlineRetry
-    - SpawnChild
-    - SpawnEscalateHuman
-    - DecomposeIntoChildren (legacy,保留)
-    - DecomposeByIntentSegments (NEW,DM-20260707-001)
-  
-  DecomposeByIntentSegments 携带 IntentSegmentSet 字段,Plan 节点
-  在 segment 数 >= 2 时倾向选择;len(Segments)==1 时退化到 InlineRetry。
+  在 Phase 2 PR-B1 Plan struct 上扩展 2 个可选字段:
+    - IntentSegmentSet *orchtypes.IntentSegmentSet  (NEW,DM-20260707-001)
+    - DAG             *PlanDAG                       (NEW,DM-20260707-001)
+
+  触发规则(Plan.Validate 后,ItemPipelineRunner.Run() 入口判断):
+    - Plan.IntentSegmentSet != nil && Plan.DAG != nil
+      → 走 multi-intent 路径:Execute 调用 DAGExecutor.RunPlanDAG(Plan.DAG)
+      → Plan.IntentSegmentSet 透传给 RunPlanDAG 用于 Learn per-segment 归因
+    - Plan.IntentSegmentSet != nil && Plan.DAG == nil
+      → Plan 不一致错误(PlanLLMOutputInvalidJSON):ItemPipelineRunner emit abort
+      → Decision 走 plan_error 路径(§3.14 第 11 行映射)
+    - Plan.IntentSegmentSet == nil
+      → 走现有 4-channel 路径(PlanKind 决定 Channel),向后兼容
+
+  SpawnPolicy 完全不动(SpawnNone / SpawnDecompose / SpawnInline 保持 3 值)。
+  multi-intent 在 Round.AttemptNo == 1 时,Round.SpawnPolicy 不变,只影响
+  Plan 字段;Learn per-segment 写入 ReputationStore(per-segment α/β)。
 ```
 
 ## 5. New Feature Flag: `devrix.d7.dag_executor.enabled`

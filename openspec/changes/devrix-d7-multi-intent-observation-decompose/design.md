@@ -2,6 +2,10 @@
 
 **Change ID:** `devrix-d7-multi-intent-observation-decompose`
 
+> **⚠️ 2026-07-07 事实校准**:本设计文中提到的 "扩展 `SpawnPolicy` 加 `DecomposeByIntentSegments` 变体" 与代码事实不符。实际 `SpawnPolicy` 是 `workmodel/pipeline_round.go:27-34` 的 3 值字符串枚举(SpawnNone/SpawnDecompose/SpawnInline),由 CC-1.1~CC-1.5 锚定,不可改。本 Change 采用方案 β:`Plan` 加 2 可选字段(`IntentSegmentSet` + `DAG`),SpawnPolicy 完全不动。
+>
+> **⚠️ Single-Layer Scope Banner**:本文档设计的 6 节点流水线(Observe/Plan/Execute/Verify/Decision/Learn)是 **WorkTree 的单层 inner-loop**。跨层递归(层 n 的 Learn → AdaptivePrior → 层 n+1 的 Observe;`MaxDecomposeDepth = 3`)走 v2 多层 worktree 协议,**不在本 Change 范围**。
+
 ---
 
 ## 1. Architecture
