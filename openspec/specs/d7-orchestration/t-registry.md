@@ -1351,6 +1351,24 @@ session_turn_loop.RunParallelExplore (S2-A50 LoopDepthTracker v2)
 
 ---
 
+### D7-S5-A121: UserContextPrepend Boundary + UncertaintyReport Info Density (DM-20260706-008) — Change: `devrix-d7-proposer-prepend-and-report-summary-fix` (S7_Archived)
+
+> **PR:** #449 (DM-20260706-007: Observe+Plan Fix A/B) + #450 (DM-20260706-008: Execute trace verify + CI guard) + #460 (跨域 debt: IntentSegmenter 补 wired)  
+> **触发事件:** `sess_1783333760211_6000` 飞书卡片❌ 根因 → D2→D3 边界吞 + UncertaintyReport 信息坍塌  
+> **CI guard:** `scripts/check-d7-d3-prepend-boundary.sh` 扫描 sessionorchestrator/ 内 InvokeStream call sites,前 30 行必现 messagesForLLMInvoke
+
+| T ID | 描述 | 归属 A | Test 位置 | Status | Priority | Span Evidence |
+|------|------|--------|-----------|--------|----------| --- |
+| **D7-S5-A121-T01** | `uncertaintyReportSignature(anomalyCount)` → `uncertaintyReportSummary(report)` 签名扩展;扫描 `report.Observations`,序列化 ObsUncertainty.Question + ObsDeviation.Statement(strength ≥ 0.7 阈值过滤);`intent=<kind>` 永远保留作为第一段(向后兼容) | **D7-S5-A121** | `deliverable_execute.go::uncertaintyReportSummary` + `deliverable_execute_test.go::TestUncertaintyReportSummary_*` (5 tests) | **IMPLEMENTED (DM-20260706-008)** | **P0** | Prepend_Boundary |
+| **D7-S5-A121-T02** | `LLMObservationProposer.ProposeObservations` msgs 改为走 `messagesForLLMInvoke(msgs, prepared.UserContextPrepend)`(PR #449 Fix B 第 1 处) | **D7-S5-A121** | `llm_observation_proposer.go:55` + `llm_observation_proposer_test.go::TestLLMObservationProposer_RoutesUserContextPrepend` | **IMPLEMENTED (DM-20260706-008)** | **P0** | Prepend_Boundary |
+| **D7-S5-A121-T03** | `LLMStrategicPlanProposer.ProposeStrategicPlan` msgs 改为走 `messagesForLLMInvoke(msgs, prepared.UserContextPrepend)`(PR #449 Fix B 第 2 处) | **D7-S5-A121** | `strategic_plan_proposer.go:403` + `strategic_plan_proposer_usercontext_test.go::TestLLMStrategicPlanProposer_RoutesUserContextPrepend` | **IMPLEMENTED (DM-20260706-008)** | **P0** | Prepend_Boundary |
+| **D7-S5-A121-T04** | `LLMIntentSegmenter.SegmentRequest` 新增 `UserContextPrepend map[string]string` 字段(forward-compatible nil 零值) + `Segment()` msgs 走 `messagesForLLMInvoke(msgs, req.UserContextPrepend)`(PR #460 跨域 debt 修复 PR-A2 的 5th InvokeStream call site) | **D7-S5-A121** | `intent_segmenter.go::SegmentRequest` + `intent_segmenter_llm_test.go::TestLLMIntentSegmenter_RoutesUserContextPrepend` | **IMPLEMENTED (DM-20260706-008)** | **P0** | Prepend_Boundary |
+| **D7-S5-A121-T05** | `scripts/check-d7-d3-prepend-boundary.sh` CI guard:扫描 sessionorchestrator/ 内 InvokeStream/InvokeNonStream call sites,验证前 30 行已调 `messagesForLLMInvoke`,allow-list `semantic_verifier_default.go`(Verify 节点 template-mimicry 检测) | **D7-S5-A121** | `scripts/check-d7-d3-prepend-boundary.sh` (NEW) + 6/6 call sites 通过 + 1 allow-list | **IMPLEMENTED (DM-20260706-008)** | **P0** | Prepend_Boundary |
+
+**A121 Total:** 5 P0 T — 5 IMPLEMENTED (DM-20260706-008 S7_Archived via 3-PR hotfix cycle)
+
+---
+
 ## D7-S16 ~ S19: TaskContract 统一 (DM-20260629-006) — DESIGN ONLY
 
 > **Change:** `devrix-d7-taskcontract-unification` (DM-20260629-006)  

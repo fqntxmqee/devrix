@@ -1,6 +1,6 @@
 # D7 Proposer UserContextPrepend + ReportSummary 信息密度修复 (DM-20260706-008)
 
-> **状态**:✅ **S7_Archived**(2026-07-06)— 全 3 proposer + CI guard 闭环
+> Status: ✅ **S7_Archived**(2026-07-06) — 全 3 proposer + CI guard 闭环
 > **关联**:DM-20260706-007 (PR #449) 覆盖 Observe + Plan;本 Change 覆盖 Execute 验证 + 防御性 CI guard
 > **优先级**:P0 — 阻断 LLM 完整消费上游 context,sess_1783333760211_6000 类飞书卡 ❌ 根因
 

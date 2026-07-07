@@ -1,0 +1,47 @@
+change_id: devrix-d7-proposer-prepend-and-report-summary-fix
+demand_id: DM-20260706-008
+title: D7 Proposer UserContextPrepend + ReportSummary 信息密度修复
+priority: P0
+status: s7_archived
+domains: [D7]
+dsaft_scenarios:
+  - D7-S2   # Session Orchestrator (RunTurn / ProcessMessage boundary)
+  - D7-S5   # Observe node (LLMObservationProposer)
+  - D7-S9   # Execute node (WorkitemExecutor + Execute sub-turn)
+dsaft_activities:
+  - D7-S5-A121   # UserContextPrepend boundary + UncertaintyReport serialization (NEW)
+dsaft_subactivities:
+  - D7-S5-A121-FixA       # uncertaintyReportSummary serialization (ObsUncertainty + ObsDeviation)
+  - D7-S5-A121-FixB       # LLMObservationProposer + StrategicPlanProposer route through messagesForLLMInvoke
+  - D7-S5-A121-FixC       # LLMIntentSegmenter routes through messagesForLLMInvoke (PR #460 cross-change debt)
+  - D7-S5-A121-CIGuard    # scripts/check-d7-d3-prepend-boundary.sh (CI defense)
+t_points:
+  - D7-S5-A121-T01
+  - D7-S5-A121-T02
+  - D7-S5-A121-T03
+  - D7-S5-A121-T04
+  - D7-S5-A121-T05
+pr: "PR #449 + PR #450 + PR #460 (DM-20260706-007 + DM-20260706-008 + 跨域联动, 全部 squash merged)"
+supersedes: []
+version_scope:
+  d7-orchestration: "v4.27.0 → v4.28.0 (incremental via PR #449 + #450 + #460)"
+follow_up_changes:
+  - devrix-d7-frame-delta-phase1-2-span-trigger  # DM-20260706-001 (S3_Design sibling)
+notes: |
+  Implementation was completed as 3-PR hotfix on 2026-07-06/08:
+  - PR #449 (DM-20260706-007): uncertaintyReportSummary serialization + Observe/Plan
+    proposer UserContextPrepend wiring (3 proposer fixes + 7 new unit tests)
+  - PR #450 (DM-20260706-008): Execute node trace verification (0 code change) +
+    scripts/check-d7-d3-prepend-boundary.sh CI guard (defense in depth)
+  - PR #460 (cross-change debt, 2026-07-08): IntentSegmenter.SegmentRequest
+    add UserContextPrepend field + messagesForLLMInvoke wrap so PR-A2's 5th
+    InvokeStream call site does not bypass D2→D3 boundary (CI guard now PASS)
+
+  All PRs shipped to prod without a prior OpenSpec S1-S5 record; this S6 archive
+  retroactively documents the change so the verification trail is complete.
+
+  Cross-change debt resolution (hotfix PR #460, 2026-07-08):
+  PR #452 (DM-20260707-001 PR-A2) introduced IntentSegmenter which added a 5th
+  InvokeStream call site that bypassed messagesForLLMInvoke, triggering CI guard
+  FAIL. Hotfix wired IntentSegmenter.SegmentRequest.UserContextPrepend through
+  messagesForLLMInvoke, restoring guard PASS. See acceptance-report.md §3.4.
