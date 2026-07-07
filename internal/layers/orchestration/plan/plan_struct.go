@@ -59,6 +59,14 @@ type Plan struct {
 	// enforced by plan/dag_validator.go; Plan.Validate() does not check it.
 	DAG *PlanDAG `json:"dag,omitempty"`
 
+	// Metadata (DM-20260707-001 PR-F T71) — generic string→string bag for
+	// routing hints that don't fit any of the typed fields above. The
+	// canonical key is "force_plan" (set via InjectForcePlanHint) which the
+	// next Execute round reads via ShouldForcePlanFromPlan to bypass the
+	// observational fast-path. Plan.Validate() does not check Metadata —
+	// callers are responsible for not colliding with reserved keys.
+	Metadata map[string]string `json:"metadata,omitempty"`
+
 	CreatedAt time.Time `json:"created_at"`
 	// FailureCriteriaOpWhitelist and ObservableFailureCriterionFields are
 	// package-level; Validate() reads them.

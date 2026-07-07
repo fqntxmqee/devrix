@@ -136,6 +136,11 @@ func computeForcePlanSignal(sessionID string, alpha, beta int) *ForcePlanSignal 
 //
 // Returns nil when the signal is not triggered (no metadata written —
 // Observe reads the absence of "force_plan=true" as a no-op).
+//
+// Cross-package contract (PR-F T71): the field names emitted here MUST match
+// the keys in plan.ForcePlanMetaKey / plan.ForcePlanMetaRatioKey / etc.
+// The contract is enforced by
+// mups/learn/force_plan_integration_test.go (TestEmitMetadataContract_*).
 func EmitForcePlanMetadata(signal *ForcePlanSignal) map[string]string {
 	if signal == nil || !signal.Triggered {
 		return nil
@@ -147,6 +152,7 @@ func EmitForcePlanMetadata(signal *ForcePlanSignal) map[string]string {
 		"force_plan_beta":        fmt.Sprintf("%d", signal.Beta),
 		"force_plan_reason":      signal.Reason,
 		"force_plan_computed_at": signal.ComputedAt.Format(time.RFC3339Nano),
+		"force_plan_session_id":  signal.SessionID,
 	}
 }
 
