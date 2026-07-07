@@ -1,0 +1,89 @@
+change_id: devrix-d7-multi-intent-observation-decompose
+demand_id: DM-20260707-001
+title: D7 multi-intent observation decompose + Plan DAG + parallel Execute + 6-node Decision
+priority: P0
+status: s7_archived
+domains: [D7]
+dsaft_scenarios:
+  - D7-S3   # WaveScheduler DAGExecutor
+  - D7-S5   # Plan Node (PlanDAG + AcceptanceContract + PlanFieldValidator + 26 scenarios)
+  - D7-S6   # Decision Node + Learn Node (AsyncLearner + force_plan + UserAction + 22 scenarios)
+dsaft_activities:
+  - D7-S5-A50   # IntentSegment grammar + IntentSegmentSet (PR-A1)
+  - D7-S5-A51   # AcceptanceCriterion + AC aggregation + CustomLLMJudge (PR-A2)
+  - D7-S5-A70   # Plan 26 scenarios + PlanFieldValidator + PlanParseReject + force_plan inject (PR-F, NEW)
+  - D7-S3-A50   # DAGExecutor interface + RunPlanDAG 4-worker pool (PR-B)
+  - D7-S6-A60   # Decision Node 5 DecisionKind + 11-row mapping table (PR-B+PR-D)
+  - D7-S6-A70   # Learn Node 升格: LearnPolicy 22 场景 + AsyncLearner + force_plan + 3-tier degradation (PR-E, NEW)
+  - D7-S2-A50   # streaming EmitPartial/EmitFinal + IdempotencyKey (PR-C)
+t_points:
+  - D7-S5-A50-T01
+  - D7-S5-A50-T02
+  - D7-S5-A50-T03
+  - D7-S5-A50-T04
+  - D7-S5-A51-T01
+  - D7-S5-A51-T02
+  - D7-S5-A51-T03
+  - D7-S5-A51-T04
+  - D7-S5-A51-T05
+  - D7-S5-A51-T06
+  - D7-S5-A51-T07
+  - D7-S5-A51-T08
+  - D7-S5-A51-T09
+  - D7-S5-A51-T10
+  - D7-S5-A51-T11
+  - D7-S5-A51-T12
+  - D7-S5-A51-T13
+  - D7-S5-A51-T14
+  - D7-S5-A51-T15
+  - D7-S3-A50-T01
+  - D7-S3-A50-T02
+  - D7-S3-A50-T03
+  - D7-S3-A50-T04
+  - D7-S3-A50-T05
+  - D7-S6-A60-T01
+  - D7-S6-A60-T02
+  - D7-S6-A60-T03
+  - D7-S6-A60-T04
+  - D7-S6-A60-T05
+  - D7-S6-A60-T06
+  - D7-S6-A60-T07
+  - D7-S6-A60-T08
+  - D7-S6-A60-T09
+  - D7-S6-A60-T10
+  - D7-S6-A60-T11
+  - D7-S6-A60-T12
+  - D7-S6-A60-T13
+  - D7-S6-A60-T14
+  - D7-S6-A60-T15
+  - D7-S6-A60-T16
+  - D7-S6-A60-T17
+  - D7-S2-A50-T11
+  - D7-S2-A50-T12
+  - D7-S5-A50-T16
+  - D7-S6-A70-T01
+  - D7-S6-A70-T02
+  - D7-S6-A70-T03
+  - D7-S6-A70-T04
+  - D7-S6-A70-T05
+  - D7-S6-A70-T06
+  - D7-S5-A70-T01
+  - D7-S5-A70-T02
+  - D7-S5-A70-T03
+  - D7-S5-A70-T04
+  - D7-S5-A70-T05
+  - D7-S5-A70-T06
+  - D7-S5-A70-T07
+pr_count: 8  # PR-A1 + PR-A2 + PR-B + PR-B fix + PR-C + PR-D + PR-E + PR-F
+version_scope:
+  d7-orchestration: "v4.29.0 → v4.30.0"
+supersedes: []
+related_changes:
+  - devrix-d7-mups-v4-phase4-verify-promotion  # Decompose pipeline ancestor
+  - devrix-d7-mups-v4-phase6-observe-learner-wiring  # Observation foundation
+  - DM-20260706-011  # observational_answer fast-path (predecessor capability)
+notes: |
+  7-step PR 联动 (PR-A1 grammar → PR-A2 AC contract → PR-B DAGExecutor+Decision → PR-B fix → PR-C
+  streaming → PR-D config flag+tests → PR-E Learn 升格 → PR-F Plan 26 场景) 全部 MERGED (#451..#458)。
+  59/59 P0 T IMPLEMENTED, 26/26 orchestration packages go test -race 100% PASS。5 节点管道升格 6 节点
+  (Observe→Plan→Execute→Verify→Decision→Learn)。详见 acceptance-report.md。
