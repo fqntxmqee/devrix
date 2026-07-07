@@ -128,6 +128,11 @@ type CoordinatorFileConfig struct {
 	// config.CoordinatorConfig for semantics. Inner pointer so
 	// "absent in yaml" → keep default (Enabled=true production).
 	SemanticConvergence *SemanticConvergenceFileConfig `yaml:"semantic_convergence"`
+	// DAGExecutor (DM-20260707-001 PR-D): runtime gate for the multi-intent
+	// DAG fork at ItemPipelineRunner.Run(). Inner pointer so "absent in yaml"
+	// → keep default (Enabled=false production; ops flips to true during
+	// the 5%→100% staged rollout).
+	DAGExecutor *DAGExecutorFileConfig `yaml:"dag_executor"`
 }
 
 // LoadConfigFile loads configuration from a YAML file

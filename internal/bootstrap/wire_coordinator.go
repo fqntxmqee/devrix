@@ -58,6 +58,11 @@ func InitOrchestration(
 		CommandFirst:       boolPtr(coordCfg.coordCfg.CommandFirst),
 		PriorContextRounds: intPtr(coordCfg.coordCfg.PriorContextRounds),
 		SemanticConvergence: buildSemanticConvergenceFileConfig(coordCfg.coordCfg.SemanticConvergence),
+		// DM-20260707-001 PR-D (T29): propagate dag_executor sub-config
+		// from the YAML file so ops can flip the multi-intent DAG fork
+		// without code changes. Default in cfg defaults is OFF; nil here
+		// lets BuildDAGExecutorConfig preserve defaults.
+		DAGExecutor: buildDAGExecutorFileConfig(coordCfg.coordCfg.DAGExecutor),
 	}
 	coordinatorCfg := orchtypes.BuildConfig(&coordinatorFileCfg)
 
@@ -151,6 +156,10 @@ func InitOrchestration(
 		// pre-check (MinSimilarity) gates the LLM call so the cost is
 		// bounded to stagnation-suspect rounds only.
 		SemanticConvergence: coordinatorCfg.SemanticConvergence,
+		// DM-20260707-001 PR-D (T29): flip the multi-intent DAG fork gate
+		// when ops has set dag_executor.enabled=true. Default false keeps
+		// the legacy single-WorkItem path active.
+		DAGEnabled:       coordinatorCfg.DAGExecutor.Enabled,
 	})
 	if err != nil {
 		return fmt.Errorf("d7: wire item pipeline: %w", err)

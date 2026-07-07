@@ -278,6 +278,20 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 ---
 
+### D7-S9-A119: Observational Fast-Path i18n + observability (DM-20260706-011) — Change: `devrix-d7-observational-fastpath` (S7_Archived)
+
+| T ID | 描述 | 归属 A | Test 位置 | Status | Priority | Span Evidence |
+|------|------|--------|-----------|--------|----------| --- |
+| **D7-S9-A119-T01** | `hardening.EmitMUPSFastPath(ctx, sessionID, workItemID, "observational_answer")` 包裹 fast-path round span (Jaeger 5-node 旁路 fast-path span) | **D7-S9-A119** | `hardening/emitter.go::EmitMUPSFastPath` | **IMPLEMENTED (DM-20260706-011)** | **P0** | FastPath_Span |
+| **D7-S9-A119-T02** | i18n ZH suffix `observationTaskAppendixZHSuffix` 新增一行：确定性问答 statement 字段直达用户 + strength ≥ 0.9 | **D7-S9-A119** | `contextengine/i18n/format_hints_mups.go` + `format_hints_mups_test.go` (golden) | **IMPLEMENTED (DM-20260706-011)** | **P0** | FastPath_Prompt |
+| **D7-S9-A119-T03** | i18n EN suffix `observationTaskAppendixENSuffix` 新增一行：deterministic Q&A statement direct + strength ≥ 0.9 | **D7-S9-A119** | `contextengine/i18n/format_hints_mups.go` + `format_hints_mups_test.go` (golden) | **IMPLEMENTED (DM-20260706-011)** | **P0** | FastPath_Prompt |
+| **D7-S9-A119-T04** | i18n golden hash 再生 (commit a61c1e58)：ZH + EN suffix 字节级 lock 避免后续 prompt 漂移 | **D7-S9-A119** | `format_hints_mups_test.go::TestGoldenHash` | **IMPLEMENTED (DM-20260706-011)** | **P0** | FastPath_Prompt |
+| **D7-S9-A119-T05** | 9 单元测试 (TriggersOnHighStrengthFact / SkippedWhenUncertaintyExists / SkippedForLowStrengthFact / SkippedForSystemCategory / LearnerReceivesVerdict / PersistsArtifactMetadata / SkippedForRollupItems / RoundIsCallerReady / LearnerSourceIDIncludesObsID) + 27/27 orchestration packages -race PASS | **D7-S9-A119** | `item_pipeline_fastpath_test.go` (394 lines) | **IMPLEMENTED (DM-20260706-011)** | **P0** | FastPath_Test |
+
+**A119 Total:** 5 P0 T — 5 IMPLEMENTED (DM-20260706-011 S7_Archived)
+
+---
+
 ## D7-S10: Verify Node (MUPS v4.3 Phase 4 + DM-20260701-007)
 
 > **v3.12 closure (2026-06-23):** devrix-d7-mups-v4-phase4-verify-promotion (DM-20260623-002) -- Phase 4 Verify 节点升格 (A32/A33/A34/A35 模块): VerdictKind 4 态 typed enum + AggregationStrategy 4 策略 + VerdictToExitReason 4 Verdict -> 4 ExitReason 映射 + VerifyWithRetry G8-1 修复 + Evidence struct 5 字段 + EvidenceExtractor 3 实现 + SystemAnomalyAggregator 阈值触发 + ObserveNode wiring SystemAnomaly. IMPLEMENTED 147->155, P0 114->122, Scenarios 0->4.
@@ -683,10 +697,10 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | Scenario | Total | IMPLEMENTED | PARTIAL | PLANNED |
 |----------|-------|-------------|---------|---------|
 | D7-S1 | 9 | 9 | 0 | 0 |
-| D7-S2 | 44 | 44 | 0 | 0 |
-| D7-S3 | 21 | 21 | 0 | 0 |
+| D7-S2 | 46 | 46 | 0 | 0 |
+| D7-S3 | 26 | 26 | 0 | 0 |
 | D7-S4 | 13 | 9 | 0 | 4 |
-| D7-S5 | 28 | 28 | 0 | 0 |
+| D7-S5 | 47 | 47 | 0 | 0 |
 | D7-S6 (Error Agg) | 7 | 7 | 0 | 0 |
 | **D7-S7** (Cross-cutting Hardening) | **4** | **4** | **0** | **0** |
 | D7-S8 | 9 | 9 | 0 | 0 |
@@ -755,6 +769,7 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 | **4.26.0** | **2026-07-02** | **devrix-mups-tool-classification-and-channel-autonomy (DM-20260701-007) S4+S5 验收**: D7-S9-A50-T01..T08 ToolChannel Router + 4 channels (Phase B 8 T) + D7-S9-A26-T06 PlanChannel rename (Phase B-pre 1 T) + D7-S10-A50-T01..T04 VerifyContract + BurdenOfProof + D1 Reason 透传 (Phase C 4 T) + D7-S2-A50-T07/T08 meta 透传 + Learn ReasonLog (Phase C 2 T) -- **15 新 T 全部 P0 IMPLEMENTED**. Total 266->281, P0 222->237. S10 新 S section (0->4 A + 12 T 含 8 既有 A32/A33/A34/A35). PR-B/C/D 待合入. 详见 acceptance-report.md (verdict: ACCEPTED). [retroactive S6 archive 2026-07-02 — DM-20260702-008 devrix-token-design-v2 PR #376 (ProbeToolChannel.Accept 永真 T09 + read_file offset/limit T10 + Default OpenEnded T11 + task_kind 推 advisory T12 共用此版本条目, 详见 `openspec/archive/2026-07-02-devrix-token-design-v2/acceptance-report.md`] |
 | **4.27.0** | **2026-07-02** | **devrix-d2-tool-input-aware-concurrency-and-classifier (DM-20260702-009) S5 验收 S6 归档**: D7-S10-A50-T22 AutoModeClassifier P2 interface stub + D7-S10-A50-T23 ChannelRouter TODO 占位 + D7-S10-A50-T24 Classifier interface stub 单测 (4 单测) + D7-S9-A50-T26 Bash sibling abort (per-batch controller) + D7-S9-A50-T27 StreamingToolExecutor.Discard() + fallback 路径 wiring — **5 新 T 全部 IMPLEMENTED (3 P0 + 2 P1)**. Total 281→286, P0 237→240. 2 tech-debt 关闭 (TD-STE-02 + TD-STE-03). 5 PR (PR-D+E `57469504` + PR-F `1763b2cb`+`cbcc57d9`+`c0ef5954`) 全部合入. 详见 `openspec/archive/2026-07-02-devrix-d2-tool-input-aware-concurrency-and-classifier/acceptance-report.md` (verdict: ACCEPTED). |
 | **4.28.0** | **2026-07-04** | **devrix-runtime-feedback-closure (DM-20260704-003) S5 验收**: D7-S2-A50-T09/T10 executeOne tool-level timeout (default 60s, env `DEVRIX_TOOL_TIMEOUT_SECONDS` 可调) + fail-closed `tool execution timeout` 错误 — **2 新 T 全部 P0 IMPLEMENTED**. Total 286→288, P0 240→242. 详见 `openspec/changes/devrix-runtime-feedback-closure/acceptance-report.md` (verdict: ACCEPTED). |
+| **4.29.0** | **2026-07-07** | **devrix-d7-multi-intent-observation-decompose (DM-20260707-001) PR-A1+PR-A2+PR-B+PR-C MERGED + PR-D 在 review**: (1) **PR-A1 grammar** D7-S5-A50-T01..T04 (`IntentSegment` 5 字段类型 + `IntentSegmentSet` 容器 + `PlanDAG` 含 PlanNode/DataEdge/Priorities + 方案 β 修订 `plan.Plan` 加 `IntentSegmentSet` + `DAG` 2 字段, SpawnPolicy 不动); (2) **PR-A2 AC contract + LLM IO** D7-S5-A51-T01..T15 (`AcceptanceCriterion` 8 CheckKind 枚举 + `PerCriterionVerdict` 4 Outcome + aggregation 4 路径 + `PlanAcceptanceContractBuilder` + `PlanLLMIO`/`VerifyLLMIO` JSON schema + `PlanParseReject` 3 子类 feedback loop + CustomLLMJudge budget ≤ 3 + 2 sentinel error); (3) **PR-B WaveScheduler + Decision Node + Sub-Worker Spawn** D7-S3-A50-T01..T05 (`DAGExecutor` interface + `RunPlanDAG` 4-worker pool + readySet priority heap + 任一 error cancel sibling) + **D7-S6-A60-T01..T07 Decision 节点核心** (DecisionKind 5 枚举 accept/retry/child_worker/parent_rollup/human_review + Validate + Decide interface + 11 行静态映射表 10 Verdict-based + 1 plan_error + ChildWorkItemSpec 校验 + MarshalDecisionJSON wire format + round.DecisionKind/Reason/MapRow/JSON 4 字段持久化 + ItemPipelineRunner.runDecisionStage 接线); (4) **PR-C streaming + idempotency** D7-S2-A50-T11/T12 (`EmitPartial`/`EmitFinal` 飞书 API + in-memory dedup table by (session_id, segment_id)); (5) **PR-D config flag + e2e** D7-S5-A50-T16 `devrix.d7.dag_executor.enabled` (default false, 5%→100% 灰度) + D7-S6-A60-T08..T17 (28 单元测试覆盖 11 行映射 + ChildWorkItemSpec 6 子类 + MarshalDecisionJSON round-trip + no-spec omit + map-miss fallback + Runaway AttemptNo + Negative guard + 7 E2E LP-3/LP-4: parent_rollup sibling gating / accept happy path / DAG fork suppressed when flag off / DAG fork suppressed when flag on + nil executor / fail + max retry → human_review / accept preserves base exit reason / helper uses production learner). **PR-A1/A2/B/C MERGED, PR-D 在 review**: Total **288→332, +44 T (33 IMPLEMENTED + 11 PLANNED)**, P0 242→286; 26/26 orchestration packages go test -race 100% PASS; go vet 0 warning; PR-E (Learn Node 升格 + 异步化 + 22 场景) + PR-F (Plan 26 场景) 待开. 详见 `openspec/changes/devrix-d7-multi-intent-observation-decompose/`. |
 | 1.0.0 | 2026-06-13 | 初始（仅 ORCH-S2-T* 遗留 ID） |
 | 2.0.0 | 2026-06-14 | D7-S*-T* 统一编号、Legacy 映射、S1/S5/契约 T 点补全 |
 | 2.1.0 | 2026-06-14 | Review R1：T02 拆分、T06/T07、MIG-T01、v1.0/v1.1 范围标注 |
@@ -1319,6 +1334,19 @@ session_turn_loop.RunParallelExplore (S2-A50 LoopDepthTracker v2)
 
 
 **Phase 1–3 Total:** IMPLEMENTED (PR #269–#270, #273–#275)
+
+---
+
+### D7-S5-A118: Observational-Answer Fast-Return (DM-20260706-011) — Change: `devrix-d7-observational-fastpath` (S7_Archived)
+
+| T ID | 描述 | 归属 A | Test 位置 | Status | Priority | Span Evidence |
+|------|------|--------|-----------|--------|----------| --- |
+| **D7-S5-A118-T01** | `pickHighStrengthBusinessFact(report, threshold)` 纯函数：CatBusiness + Strength ≥ threshold + FactPayload.Statement 非空 → 返回 (obsID, statement, true) | **D7-S5-A118** | `deliverable_execute.go::pickHighStrengthBusinessFact` | **IMPLEMENTED (DM-20260706-011)** | **P0** | Observe_FastPath |
+| **D7-S5-A118-T02** | `hasObsUncertainty(report)` 纯函数 + source-filter：阻断 `observe_proposer_*` / `scope_contract_*` / 用户级；放过 `item_pipeline` / `verify_signal` 机械信号 | **D7-S5-A118** | `deliverable_execute.go::hasObsUncertainty` | **IMPLEMENTED (DM-20260706-011)** | **P0** | Observe_FastPath |
+| **D7-S5-A118-T03** | `maybeObservationalAnswer(ctx, sessionID, item, report, obsIDs, obsFactID, statement, started, roundNo, trigger)`：build Verdict + Artifact (WorkerWorkItem + source=observational_answer_fastpath) + Round (ExitReason=observational_answer + UncertaintyMean=0) + call Learner + ApplyPipelineRound(RoundPhaseIdle) | **D7-S5-A118** | `item_pipeline.go::maybeObservationalAnswer` | **IMPLEMENTED (DM-20260706-011)** | **P0** | Observe_FastPath |
+| **D7-S5-A118-T04** | `Run()` 4-gate fork gate at line 285-298：AND 4 conditions (!isRollup / !isDeliverableSynth / !isParentRollup / r.Learner != nil / !hasObsUncertainty / pickHighStrengthBusinessFact ok)；任一 miss → 降级 Plan 路径无 error | **D7-S5-A118** | `item_pipeline.go:285-298` + `item_pipeline_fastpath_test.go::TestObservationalAnswerFastPath_*` (9 tests) | **IMPLEMENTED (DM-20260706-011)** | **P0** | Observe_FastPath |
+
+**A118 Total:** 4 P0 T — 4 IMPLEMENTED (DM-20260706-011 S7_Archived)
 
 ---
 

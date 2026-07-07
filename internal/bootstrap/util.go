@@ -43,6 +43,20 @@ func buildSemanticConvergenceFileConfig(in config.SemanticConvergenceFileConfig)
 	}
 }
 
+// buildDAGExecutorFileConfig converts the shared/config DAGExecutorFileConfig
+// into the orchtypes DAGExecutorFileConfig (DM-20260707-001 PR-D). Returns
+// nil when no pointer is set, preserving the orchtypes default.
+func buildDAGExecutorFileConfig(in config.DAGExecutorFileConfig) *orchtypes.DAGExecutorFileConfig {
+	if in.Enabled == nil && in.MaxFanOut == nil && in.MaxRetryOnPartialFail == nil {
+		return nil
+	}
+	return &orchtypes.DAGExecutorFileConfig{
+		Enabled:               in.Enabled,
+		MaxFanOut:             in.MaxFanOut,
+		MaxRetryOnPartialFail: in.MaxRetryOnPartialFail,
+	}
+}
+
 // mapBackgroundStatus converts a BackgroundRegistry status string to a
 // coordinator TaskStatus. BackgroundRegistry uses "running" while the work
 // model uses "in_progress"; all other values ("completed", "failed",

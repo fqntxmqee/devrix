@@ -1,10 +1,10 @@
 change_id: devrix-d7-multi-intent-observation-decompose
-title: D7 multi-intent observation decompose + Plan DAG + parallel Execute
+title: D7 multi-intent observation decompose + Plan DAG + parallel Execute + 6-node Decision
 demand_id: DM-20260707-001
-status: S2_Proposal
+status: S4_Implementation
 created: 2026-07-07
 priority: P0
-pr_count: 4
+pr_count: 5  # PR-A1 + PR-A2 + PR-B + PR-C MERGED, PR-D in review
 reporter: user
 sprint: devrix-d7-v7
 
