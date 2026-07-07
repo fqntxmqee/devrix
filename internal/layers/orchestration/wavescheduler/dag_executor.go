@@ -362,6 +362,9 @@ func (d *dagExecutor) spawnConsumer(ctx context.Context, sessionID, planDAGID st
 						}
 					}
 					emitFinalIfMissing(d.scheduler, sessionID, planDAGID, graph, emitted, out)
+					slog.Info("dag_executor: run_done",
+						"session", sessionID, "plan_dag_id", planDAGID,
+						"reason", "all_terminal", "emitted_count", len(emitted))
 					return
 				}
 			}
@@ -460,6 +463,18 @@ func (d *dagExecutor) abortAndDrain(sessionID, planDAGID string, graph *TaskGrap
 		"session", sessionID, "plan_dag_id", planDAGID,
 		"running_cancelled", running, "pending_cancelled", pending,
 		"abort_err", abortErr)
+
+	// Race-fix (mirrors the natural-completion re-drain loop, applied to
+	// the abort path): drainAnyNewTerminals may have iterated the
+	// artifact store BEFORE a worker's completeTask wrote its Put — so
+	// some artifacts are missed in the same tick. Without re-draining
+	// here, those nodes' State transitions to terminal land in the
+	// post-drain window: abortAndDrain walks NodeIDs and skips them as
+	// "already handled by drainAnyNewTerminals" — but they were never
+	// actually emitted, so the channel closes with no row for that node.
+	// We re-drain first; then walk for cancel emits only on what's still
+	// missing.
+	drainAnyNewTerminals(d.scheduler, sessionID, planDAGID, graph, emitted, failedMu, &failedIDs, out)
 
 	// Walk all known graph nodes; emit cancel for any not yet emitted
 	// AND not already in StateCompleted / StateFailed (those are
