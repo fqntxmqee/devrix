@@ -500,6 +500,114 @@ func EmitFeishuCardRender(
 	return func(err error) { endSpanWithError(span, err) }
 }
 
+// EmitDAGExecutorStreamEmit wraps wavescheduler.DAGExecutor.SegmentEmit
+// (DM-20260707-001 PR-C). Records session_id + segment_id + worker_type +
+// is_final + exit_code so dashboards can graph per-child latency + abort
+// patterns across the multi-intent decompose → rollup flow.
+func EmitDAGExecutorStreamEmit(
+	ctx context.Context,
+	sessionID, segmentID, workerType string,
+	isFinal bool,
+	exitCode int,
+	endedAtRFC3339 string,
+) func(error) {
+	attrs := []tracer.Attribute{
+		{Key: "session_id", Value: sessionID},
+		{Key: "dag.segment_id", Value: segmentID},
+		{Key: "dag.worker_type", Value: workerType},
+		{Key: "dag.is_final", Value: boolToString(isFinal)},
+		{Key: "dag.exit_code", Value: intToString(exitCode)},
+		{Key: "dag.ended_at", Value: endedAtRFC3339},
+	}
+	attrs = append(attrs, locatorAttrsFromCtx(ctx)...)
+	_, span := start(ctx, telemetry.OpD7_DAG_Executor_Stream_Emit, attrs...)
+	return func(err error) { endSpanWithError(span, err) }
+}
+
+// EmitEmitDedupMark wraps sessionorchestrator.EmitDedup.MarkAndCheck
+// (DM-20260707-001 PR-C). Records the idempotency_key + dedup_hit flag
+// so dashboards can measure the dedup-hit ratio (debug log only; emit
+// is no-op on hit).
+func EmitEmitDedupMark(
+	ctx context.Context,
+	sessionID, idempotencyKey string,
+	dedupHit bool,
+) func(error) {
+	attrs := []tracer.Attribute{
+		{Key: "session_id", Value: sessionID},
+		{Key: "dedup.idempotency_key", Value: idempotencyKey},
+		{Key: "dedup.hit", Value: boolToString(dedupHit)},
+	}
+	_, span := start(ctx, telemetry.OpD7_Emit_Dedup_Mark, attrs...)
+	return func(err error) { endSpanWithError(span, err) }
+}
+
+// EmitStreamingEmitterPartial wraps FeishuAdapter.EmitPartialCard
+// (DM-20260707-001 PR-C). Records chat_id + idempotency_key +
+// content_runes + card_sequence so streaming failures (rate limit,
+// expired card) are observable.
+func EmitStreamingEmitterPartial(
+	ctx context.Context,
+	chatID, idempotencyKey string,
+	contentRunes, cardSequence int,
+) func(error) {
+	attrs := []tracer.Attribute{
+		{Key: "session_id", Value: chatID}, // sessionID == chatID for IM stream path
+		{Key: "feishu.chat_id", Value: chatID},
+		{Key: "feishu.idempotency_key", Value: idempotencyKey},
+		{Key: "feishu.content_runes", Value: intToString(contentRunes)},
+		{Key: "feishu.card_sequence", Value: intToString(cardSequence)},
+	}
+	_, span := start(ctx, telemetry.OpD7_Streaming_Emitter_Partial, attrs...)
+	return func(err error) { endSpanWithError(span, err) }
+}
+
+// EmitStreamingEmitterFinal wraps FeishuAdapter.EmitFinalCard
+// (DM-20260707-001 PR-C). Carries the synthesized rollup payload length
+// + dedup key so the final-overrides-partial semantic is traceable.
+func EmitStreamingEmitterFinal(
+	ctx context.Context,
+	chatID, idempotencyKey string,
+	contentRunes int,
+) func(error) {
+	attrs := []tracer.Attribute{
+		{Key: "session_id", Value: chatID},
+		{Key: "feishu.chat_id", Value: chatID},
+		{Key: "feishu.idempotency_key", Value: idempotencyKey},
+		{Key: "feishu.content_runes", Value: intToString(contentRunes)},
+	}
+	_, span := start(ctx, telemetry.OpD7_Streaming_Emitter_Final, attrs...)
+	return func(err error) { endSpanWithError(span, err) }
+}
+
+// EmitLearnPerSegment wraps learn.DefaultLearner.Learn for per-segment
+// calls (DM-20260707-001 PR-C). Records session_id + segment_id +
+// parent_id + is_rollup + evidence_segment_count so reputation lineage
+// is traceable across the multi-intent decompose → rollup Learn flow.
+func EmitLearnPerSegment(
+	ctx context.Context,
+	sessionID, segmentID, parentID string,
+	isRollup bool,
+	evidenceSegmentCount int,
+) func(error) {
+	attrs := []tracer.Attribute{
+		{Key: "session_id", Value: sessionID},
+		{Key: "learn.segment_id", Value: segmentID},
+		{Key: "learn.parent_id", Value: parentID},
+		{Key: "learn.is_rollup", Value: boolToString(isRollup)},
+		{Key: "learn.evidence_segment_count", Value: intToString(evidenceSegmentCount)},
+	}
+	_, span := start(ctx, telemetry.OpD7_Learn_Per_Segment, attrs...)
+	return func(err error) { endSpanWithError(span, err) }
+}
+
+func boolToString(b bool) string {
+	if b {
+		return "true"
+	}
+	return "false"
+}
+
 func floatToString(f float64) string {
 	// 4-decimal precision keeps Beta parameters in a stable numeric
 	// range for Jaeger filter ranges without losing meaningful digits.
@@ -544,13 +652,6 @@ func intToString(n int) string {
 		buf[i] = '-'
 	}
 	return string(buf[i:])
-}
-
-func boolToString(b bool) string {
-	if b {
-		return "true"
-	}
-	return "false"
 }
 
 // --- DM-20260629-009 PR-C: 3 inner-layer spans (AC13/14/15) ---

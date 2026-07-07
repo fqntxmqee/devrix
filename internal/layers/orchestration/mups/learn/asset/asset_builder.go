@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/devrix/devrix/internal/layers/orchestration/interfaces"
+	"github.com/devrix/devrix/internal/layers/orchestration/mups/learn/reputation"
 	"github.com/devrix/devrix/internal/layers/orchestration/plan"
 	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
@@ -63,6 +64,41 @@ type LearnRequest struct {
 	// Artifact fields. PR-B fully migrates; PR-C removes the optional
 	// marker.
 	Report *interfaces.TaskReport
+
+	// SegmentID (DM-20260707-001 PR-C, codex Q4 ADOPT-WITH-CHANGE): when
+	// this Learn call is for a single child segment of a multi-intent
+	// decompose, SegmentID is the corresponding IntentSegment.ID (matches
+	// wavescheduler.SegmentEmit.SegmentID 1:1). The AssetBuilder uses this
+	// to populate LearningAsset.SourcePlanNodeIDs so reputation records
+	// track which segments contributed to the rollup.
+	//
+	// Mutually exclusive with IsRollup: rollup Learn calls set IsRollup=true
+	// and leave SegmentID empty.
+	SegmentID string
+
+	// ParentID (DM-20260707-001 PR-C): when this Learn call is for a child
+	// segment, ParentID is the parent's WorkItem.ID. Used for the
+	// SourcePlanNodeIDs lineage trace. Empty for legacy single-WorkItem
+	// Learn calls.
+	ParentID string
+
+	// IsRollup (DM-20260707-001 PR-C, codex Q4): true when this Learn call
+	// is for the parent rollup aggregation step (the merge of all child
+	// evidence into a single Verdict). When true, Evidence MUST be set to
+	// the parent-rollup aggregator (see ParentEvidence); when false,
+	// Evidence MAY be nil.
+	IsRollup bool
+
+	// Evidence (DM-20260707-001 PR-C, codex Q5 REJECT parent-evidence
+	// adaptive-prior folding — synthesized single Verdict instead): the
+	// parent-rollup aggregator's snapshot. Only set on rollup Learn calls;
+	// per-child Learn calls leave it nil. Rollup aggregator sums α/β across
+	// children and synthesizes a single rollup Verdict (Pass if all
+	// children Pass, Fail if any child Fail). The BayesianUpdate is then
+	// called ONCE on the rollup prior with that synthesized verdict —
+	// avoiding the order-sensitive Wilson-interval math that the prior
+	// `prior * (1 - failureRatio)` scalar-multiplication would have broken.
+	Evidence *reputation.ParentEvidence
 }
 
 // ObservationLookup mirrors plan.ObservationLookup so we don't pull the
@@ -121,6 +157,18 @@ func (b *AssetBuilder) Build(ctx context.Context, req LearnRequest, class Learni
 	}
 	if req.Verdict.SourceID != "" {
 		asset.SourceVerdictIDs = append(asset.SourceVerdictIDs, req.Verdict.SourceID)
+	}
+	// DM-20260707-001 PR-C Risk A2: per-segment attribution. Wire
+	// SourcePlanNodeIDs so reputation records can trace which segments
+	// contributed to the rollup.
+	switch {
+	case req.IsRollup && req.Evidence != nil:
+		// Rollup Learn: union of all child SegmentIDs from the parent
+		// aggregator (deduplicated, sorted for stable output).
+		asset.SourcePlanNodeIDs = append([]string(nil), req.Evidence.SegmentIDs...)
+	case req.SegmentID != "":
+		// Per-child Learn: single segment attribution.
+		asset.SourcePlanNodeIDs = []string{req.SegmentID}
 	}
 
 	return asset, nil

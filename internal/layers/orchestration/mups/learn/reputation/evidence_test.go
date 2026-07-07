@@ -1,6 +1,7 @@
 package reputation
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -114,7 +115,10 @@ func TestBayesianUpdate_VerdictPass_IncrementsAlpha(t *testing.T) {
 	prior, _ := NewReputationEvidence("sess_1", TrackModeDeveloper)
 	verdict := workmodel.Verdict{Kind: types.VerdictPass, SourceID: "v_1"}
 
-	next := BayesianUpdate(prior, verdict)
+	next, err := BayesianUpdate(prior, verdict)
+	if err != nil {
+		t.Fatalf("BayesianUpdate: %v", err)
+	}
 
 	if next.Alpha != 1 || next.Beta != 0 {
 		t.Errorf("Alpha/Beta = %d/%d, want 1/0", next.Alpha, next.Beta)
@@ -134,7 +138,10 @@ func TestBayesianUpdate_VerdictPartial_IncrementsAlpha(t *testing.T) {
 	prior, _ := NewReputationEvidence("sess_1", TrackModeDeveloper)
 	verdict := workmodel.Verdict{Kind: types.VerdictPartial, SourceID: "v_1"}
 
-	next := BayesianUpdate(prior, verdict)
+	next, err := BayesianUpdate(prior, verdict)
+	if err != nil {
+		t.Fatalf("BayesianUpdate: %v", err)
+	}
 
 	if next.Alpha != 1 || next.Beta != 0 {
 		t.Errorf("Partial should increment Alpha; Alpha/Beta = %d/%d", next.Alpha, next.Beta)
@@ -145,7 +152,10 @@ func TestBayesianUpdate_VerdictFail_IncrementsBeta(t *testing.T) {
 	prior, _ := NewReputationEvidence("sess_1", TrackModeDeveloper)
 	verdict := workmodel.Verdict{Kind: types.VerdictFail, SourceID: "v_1"}
 
-	next := BayesianUpdate(prior, verdict)
+	next, err := BayesianUpdate(prior, verdict)
+	if err != nil {
+		t.Fatalf("BayesianUpdate: %v", err)
+	}
 
 	if next.Alpha != 0 || next.Beta != 1 {
 		t.Errorf("Alpha/Beta = %d/%d, want 0/1", next.Alpha, next.Beta)
@@ -160,7 +170,10 @@ func TestBayesianUpdate_VerdictIndeterminate_OtherReason_NotPollutes(t *testing.
 		SourceID:           "v_1",
 	}
 
-	next := BayesianUpdate(prior, verdict)
+	next, err := BayesianUpdate(prior, verdict)
+	if err != nil {
+		t.Fatalf("BayesianUpdate: %v", err)
+	}
 
 	// Other INDETERMINATE: do NOT update α/β, only IndeterminateCount
 	if next.Alpha != 0 || next.Beta != 0 {
@@ -182,7 +195,10 @@ func TestBayesianUpdate_VerdictIndeterminate_VerifierParseFailure_OnlyIncrements
 		SourceID:            "v_1",
 	}
 
-	next := BayesianUpdate(prior, verdict)
+	next, err := BayesianUpdate(prior, verdict)
+	if err != nil {
+		t.Fatalf("BayesianUpdate: %v", err)
+	}
 
 	// ⭐G8-1 fix: verifier_parse_failure must NOT pollute α/β
 	if next.Alpha != 0 || next.Beta != 0 {
@@ -201,7 +217,10 @@ func TestBayesianUpdate_ColdStartZeroAlphaBeta_KeepsPriorMean(t *testing.T) {
 	// Cold start: prior.Mean = 0 (default NewReputationEvidence)
 	verdict := workmodel.Verdict{Kind: types.VerdictIndeterminate, SourceID: "v_1"}
 
-	next := BayesianUpdate(prior, verdict)
+	next, err := BayesianUpdate(prior, verdict)
+	if err != nil {
+		t.Fatalf("BayesianUpdate: %v", err)
+	}
 
 	// Cold start α=β=0 → Mean should preserve prior.Mean (0)
 	if next.Mean != 0 {
@@ -223,7 +242,11 @@ func TestBayesianUpdate_Convergence50Passes(t *testing.T) {
 			Kind:     types.VerdictPass,
 			SourceID: "v_" + string(rune('a'+i%26)),
 		}
-		current = BayesianUpdate(current, v)
+		var err error
+		current, err = BayesianUpdate(current, v)
+		if err != nil {
+			t.Fatalf("BayesianUpdate iter %d: %v", i, err)
+		}
 	}
 	// 50 PASS → Alpha=50, Beta=0 → Mean = 1.0
 	if current.Alpha != 50 {
@@ -241,7 +264,7 @@ func TestBayesianUpdate_DoesNotMutatePrior(t *testing.T) {
 	originalUpdateCount := prior.UpdateCount
 
 	verdict := workmodel.Verdict{Kind: types.VerdictPass, SourceID: "v_1"}
-	_ = BayesianUpdate(prior, verdict)
+	_, _ = BayesianUpdate(prior, verdict)
 
 	if prior.Alpha != originalAlpha {
 		t.Errorf("prior.Alpha mutated: %d → %d", originalAlpha, prior.Alpha)
@@ -251,6 +274,22 @@ func TestBayesianUpdate_DoesNotMutatePrior(t *testing.T) {
 	}
 	if prior.UpdateCount != originalUpdateCount {
 		t.Errorf("prior.UpdateCount mutated: %d → %d", originalUpdateCount, prior.UpdateCount)
+	}
+}
+
+func TestBayesianUpdate_NilPrior_ReturnsError(t *testing.T) {
+	// DM-20260707-001 PR-C Risk A4: prior==nil must return a clear error,
+	// not panic on the unconditional `next := *prior` deref.
+	verdict := workmodel.Verdict{Kind: types.VerdictPass, SourceID: "v_1"}
+	next, err := BayesianUpdate(nil, verdict)
+	if err == nil {
+		t.Fatal("expected error for nil prior, got nil")
+	}
+	if next != nil {
+		t.Errorf("expected nil next for nil prior, got %+v", next)
+	}
+	if !errors.Is(err, ErrReputationStoreUnavailable) {
+		t.Errorf("err should wrap ErrReputationStoreUnavailable, got %v", err)
 	}
 }
 
