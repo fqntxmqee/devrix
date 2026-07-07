@@ -278,6 +278,20 @@ D7 T 层测试点注册表。现行测试以 ORCH-S2-T* 注释标注，本文档
 
 ---
 
+### D7-S9-A119: Observational Fast-Path i18n + observability (DM-20260706-011) — Change: `devrix-d7-observational-fastpath` (S7_Archived)
+
+| T ID | 描述 | 归属 A | Test 位置 | Status | Priority | Span Evidence |
+|------|------|--------|-----------|--------|----------| --- |
+| **D7-S9-A119-T01** | `hardening.EmitMUPSFastPath(ctx, sessionID, workItemID, "observational_answer")` 包裹 fast-path round span (Jaeger 5-node 旁路 fast-path span) | **D7-S9-A119** | `hardening/emitter.go::EmitMUPSFastPath` | **IMPLEMENTED (DM-20260706-011)** | **P0** | FastPath_Span |
+| **D7-S9-A119-T02** | i18n ZH suffix `observationTaskAppendixZHSuffix` 新增一行：确定性问答 statement 字段直达用户 + strength ≥ 0.9 | **D7-S9-A119** | `contextengine/i18n/format_hints_mups.go` + `format_hints_mups_test.go` (golden) | **IMPLEMENTED (DM-20260706-011)** | **P0** | FastPath_Prompt |
+| **D7-S9-A119-T03** | i18n EN suffix `observationTaskAppendixENSuffix` 新增一行：deterministic Q&A statement direct + strength ≥ 0.9 | **D7-S9-A119** | `contextengine/i18n/format_hints_mups.go` + `format_hints_mups_test.go` (golden) | **IMPLEMENTED (DM-20260706-011)** | **P0** | FastPath_Prompt |
+| **D7-S9-A119-T04** | i18n golden hash 再生 (commit a61c1e58)：ZH + EN suffix 字节级 lock 避免后续 prompt 漂移 | **D7-S9-A119** | `format_hints_mups_test.go::TestGoldenHash` | **IMPLEMENTED (DM-20260706-011)** | **P0** | FastPath_Prompt |
+| **D7-S9-A119-T05** | 9 单元测试 (TriggersOnHighStrengthFact / SkippedWhenUncertaintyExists / SkippedForLowStrengthFact / SkippedForSystemCategory / LearnerReceivesVerdict / PersistsArtifactMetadata / SkippedForRollupItems / RoundIsCallerReady / LearnerSourceIDIncludesObsID) + 27/27 orchestration packages -race PASS | **D7-S9-A119** | `item_pipeline_fastpath_test.go` (394 lines) | **IMPLEMENTED (DM-20260706-011)** | **P0** | FastPath_Test |
+
+**A119 Total:** 5 P0 T — 5 IMPLEMENTED (DM-20260706-011 S7_Archived)
+
+---
+
 ## D7-S10: Verify Node (MUPS v4.3 Phase 4 + DM-20260701-007)
 
 > **v3.12 closure (2026-06-23):** devrix-d7-mups-v4-phase4-verify-promotion (DM-20260623-002) -- Phase 4 Verify 节点升格 (A32/A33/A34/A35 模块): VerdictKind 4 态 typed enum + AggregationStrategy 4 策略 + VerdictToExitReason 4 Verdict -> 4 ExitReason 映射 + VerifyWithRetry G8-1 修复 + Evidence struct 5 字段 + EvidenceExtractor 3 实现 + SystemAnomalyAggregator 阈值触发 + ObserveNode wiring SystemAnomaly. IMPLEMENTED 147->155, P0 114->122, Scenarios 0->4.
@@ -1320,6 +1334,19 @@ session_turn_loop.RunParallelExplore (S2-A50 LoopDepthTracker v2)
 
 
 **Phase 1–3 Total:** IMPLEMENTED (PR #269–#270, #273–#275)
+
+---
+
+### D7-S5-A118: Observational-Answer Fast-Return (DM-20260706-011) — Change: `devrix-d7-observational-fastpath` (S7_Archived)
+
+| T ID | 描述 | 归属 A | Test 位置 | Status | Priority | Span Evidence |
+|------|------|--------|-----------|--------|----------| --- |
+| **D7-S5-A118-T01** | `pickHighStrengthBusinessFact(report, threshold)` 纯函数：CatBusiness + Strength ≥ threshold + FactPayload.Statement 非空 → 返回 (obsID, statement, true) | **D7-S5-A118** | `deliverable_execute.go::pickHighStrengthBusinessFact` | **IMPLEMENTED (DM-20260706-011)** | **P0** | Observe_FastPath |
+| **D7-S5-A118-T02** | `hasObsUncertainty(report)` 纯函数 + source-filter：阻断 `observe_proposer_*` / `scope_contract_*` / 用户级；放过 `item_pipeline` / `verify_signal` 机械信号 | **D7-S5-A118** | `deliverable_execute.go::hasObsUncertainty` | **IMPLEMENTED (DM-20260706-011)** | **P0** | Observe_FastPath |
+| **D7-S5-A118-T03** | `maybeObservationalAnswer(ctx, sessionID, item, report, obsIDs, obsFactID, statement, started, roundNo, trigger)`：build Verdict + Artifact (WorkerWorkItem + source=observational_answer_fastpath) + Round (ExitReason=observational_answer + UncertaintyMean=0) + call Learner + ApplyPipelineRound(RoundPhaseIdle) | **D7-S5-A118** | `item_pipeline.go::maybeObservationalAnswer` | **IMPLEMENTED (DM-20260706-011)** | **P0** | Observe_FastPath |
+| **D7-S5-A118-T04** | `Run()` 4-gate fork gate at line 285-298：AND 4 conditions (!isRollup / !isDeliverableSynth / !isParentRollup / r.Learner != nil / !hasObsUncertainty / pickHighStrengthBusinessFact ok)；任一 miss → 降级 Plan 路径无 error | **D7-S5-A118** | `item_pipeline.go:285-298` + `item_pipeline_fastpath_test.go::TestObservationalAnswerFastPath_*` (9 tests) | **IMPLEMENTED (DM-20260706-011)** | **P0** | Observe_FastPath |
+
+**A118 Total:** 4 P0 T — 4 IMPLEMENTED (DM-20260706-011 S7_Archived)
 
 ---
 
