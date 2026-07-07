@@ -177,14 +177,14 @@ A 才是真正的"Plan 出 DAG + Execute 并行执行"。B 是 hack,只解决了
 - 每个 `PlanNode` 携带一组 `AcceptanceCriterion`(声明 artifact 应满足什么条件)
 - Plan LLM **与 PlanDAG 同步输出** acceptance_criteria[](`PlanLLMOutput`)
 - `PlanAcceptanceContractBuilder.Build(dag, ac)` 校验一致性:每个 node ≥ 1 Required criterion、AC.ID 全局唯一、无引用 missing node
-- Verify 节点拿 Artifact + AC[] → 逐条判定 → 聚合 OverallVerdictKind
+- Verify 节点拿 Artifact + AC[] → 逐条判定 → 聚合 VerdictKind
 - 机械 CheckKind(`ContainsString` / `MentionsAll` / `NumericRange` / `JSONPath` 等)**本地执行,0 LLM 调用**(延迟 < 50ms)
 - `CustomLLMJudge` CheckKind 委托 D3 LLM,带 plan_rationale,数量上限 3(budget 控制)
 
 **判定聚合规则**(PerCriterionVerdict aggregation_rule):
 
 ```
-∃ Required criterion Fail  → OverallVerdictKind = VerdictFail
+∃ Required criterion Fail  → VerdictKind = VerdictFail
 全部 Required Pass + ∃ Preferred Fail → VerdictPartial
 全部 Pass                          → VerdictPass
 任一 Error 且无 Fail              → VerdictIndeterminate
@@ -256,7 +256,7 @@ ShortCircuit: 0 CustomLLMJudge → Verify 不调 LLM (延迟 < 50ms)
 
 ### 5.5 Decision Node(D7 6 节点流水线新增独立第 5 stage)
 
-**核心思路**:Verify 节点产出 PerCriterionVerdict[] + OverallVerdictKind 后,Decision 节点(独立 stage,5 节点 → 6 节点升级)立即跑映射表,产出 5 路径决策(接受/重试/子 Worker/父 rollup/人工)。**D7 升为 6 节点流水线**(Observe/Plan/Execute/Verify/Decision/Learn,都是独立 stage)。
+**核心思路**:Verify 节点产出 PerCriterionVerdict[] + VerdictKind 后,Decision 节点(独立 stage,5 节点 → 6 节点升级)立即跑映射表,产出 5 路径决策(接受/重试/子 Worker/父 rollup/人工)。**D7 升为 6 节点流水线**(Observe/Plan/Execute/Verify/Decision/Learn,都是独立 stage)。
 
 **3 步决策**:
 
@@ -265,7 +265,7 @@ Step 1: 输入
   - PlanLLMOutput{DAG, AcceptanceCriteria, Rationale}
   - Artifact{Summary, Metadata, Evidence}
   - PerCriterionVerdict[] (顺序对齐 AC[])
-  - OverallVerdictKind {Pass | Partial | Fail | Indeterminate}
+  - VerdictKind {Pass | Partial | Fail | Indeterminate}
   - RoundMeta{AttemptNo, ChildBudgetRemaining, RiskLevel}
 
 Step 2: 决策映射表(纯规则引擎,0 LLM 调用)
@@ -316,7 +316,7 @@ Step 3: 输出 Decision{D, Reason, NextWorkItemSpec?}
 | 2. Plan | PlanLLMOutput(DAG + AC[])+ 3-shot | 不变 |
 | 3. Execute | RunPlanDAG(4 worker) | 不变 |
 | 4. **Verify** | PerCriterion 判定 → 4 态 Verdict | **不变**(PerCriterion 判定 → 4 态 Verdict) |
-| 5. **Decision** | — (旧路径无独立 Decision 节点) | **新增独立 stage**:9 行静态映射表 → 5 路径决策 |
+| 5. **Decision** | — (旧路径无独立 Decision 节点) | **新增独立 stage**:11 行静态映射表(10 Verdict-based + 1 plan_error)→ 5 路径决策 |
 | 6. **Learn** | 收 Verdict 写 reputation(全局) | **收 Decision + Verdict**(per-segment)+ ParentEvidence aggregator + **异步不阻塞** |
 
 **6 节点契约新拓扑**:
@@ -368,7 +368,7 @@ Observe → Plan → Execute → Verify → Decision → Learn
 | 节点 | Learn 依赖 | 用途 |
 |------|-----------|------|
 | **Decision (5)** | `Decision{Kind, Reason}` | retry 不累计 / human_review β++ / parent_rollup 走 aggregator |
-| **Verify (4)** | `OverallVerdictKind` + `PerCriterionVerdict[]` | BayesianUpdate:Pass→α++ / Fail→β++ |
+| **Verify (4)** | `VerdictKind` + `PerCriterionVerdict[]` | BayesianUpdate:Pass→α++ / Fail→β++ |
 | **Execute (3)** | `Artifact.MetadataHash`(可选项) | 防重(同一 artifact 重复 learn → no_change) |
 
 **Learn 不直接依赖**:Plan / Observe / User 输入(LearnRequest 不收这些字段,精简契约)。
@@ -398,7 +398,9 @@ Step 3: 输出 + 持久化
   - LearnResponse{UpdatedAlpha, UpdatedBeta, ReputationRowID, BayesianAction}
   - reputation_row 持久化到 DB(异步):
       id / segment_id / parent_id / alpha / beta / last_updated
-      decision_kind_history / source_id_history / artifact_hash
+      decision_kind_history / source_id_history / artifact_metadata_hash
+      metadata(JSON,含 rationale,user_action,force_plan)
+      deprecated_plan_rationale(冻结,只为兼容旧 row,新 row 写 metadata.rationale)
   - BayesianAction 枚举:alpha_bump | beta_bump | no_change | force_plan
 ```
 
@@ -414,10 +416,11 @@ Step 2: 内部 BayesianUpdate(纯函数,无 I/O)
 
 Step 3: 输出 + 持久化
   - LearnResponse{UpdatedAlpha, UpdatedBeta, ReputationRowID, BayesianAction}
-  - reputation_row 持久化到 DB:
+  - reputation_row 持久化到 DB(11 字段,见 §3.11 + decision-tree §8.7.4):
       id / segment_id / parent_id / alpha / beta / last_updated
-      decision_kind_history / source_id_history / plan_rationale
-      artifact_metadata_hash
+      decision_kind_history / source_id_history / artifact_metadata_hash
+      metadata(JSON,含 rationale/user_action/force_plan)
+      deprecated_plan_rationale(冻结)
   - BayesianAction 枚举:alpha_bump | beta_bump | no_change | force_plan
 ```
 
@@ -516,7 +519,7 @@ Verify (节点 4) + Decision (节点 5) 两个独立 stage
 
 | 用户行为 | Learn 触发? | 累计方向 | SourceID 前缀 | 理由 |
 |---------|------------|---------|--------------|------|
-| user-cancel (U1) | **YES** | β++ | `user_cancel:seg_a_id` | 强负信号,用户拒绝 = 该 segment 路径失效 |
+| user-cancel (U1) | **YES** | β++ | `user_cancel:seg_a_id` | 强负信号,用户拒绝 = 该 segment 路径失效;**24h 内同 segment_id ≥ 3 次 → audit_hold**(只 audit 不 β++,防误点/恶意) |
 | user-accept (U2) | **YES** | α++ (fast-track) | `user_accept:seg_a_id` | 强正信号,直接累计 α,无需等下次 trigger |
 | user-modify (U3) | **NO**(本轮) | n/a | n/a | modify 是新 directive,走新 round;原 round 不再 Learn |
 
@@ -557,7 +560,7 @@ Verify (节点 4) + Decision (节点 5) 两个独立 stage
 | 维度 | 场景数 | 关键策略 |
 |------|--------|---------|
 | 基础 5 场景 (P22-P26) | 5 | happy path,正常 6 节点流水线 |
-| Plan LLM 错误 (P1-P3) | 3 | **Decision 新增 plan_error 路径**(9 行 → 10 行映射表)+ ItemPipelineRunner emit abort + NO Learn |
+| Plan LLM 错误 (P1-P3) | 3 | **Decision 新增 plan_error 路径**(10 行 → 11 行映射表)+ ItemPipelineRunner emit abort + NO Learn |
 | 字段异常 (P4-P11) | 8 | **重试 Plan LLM ≤ 2 次**(§9 feedback_loop 3 子类)+ **降级旧 SpawnPolicy.DecomposeIntoChildren**(无 AC) |
 | Parse Reject (P12-P17) | 6 | 同 P4-P11 重试 + 降级 |
 | fast-path 命中 (P18-P19) | 2 | Plan 节点 short-circuit,NO Execute / NO Decision |
@@ -587,12 +590,12 @@ Verify (节点 4) + Decision (节点 5) 两个独立 stage
 | **P2** PlanLLMCallError (5xx) | NO Execute | 同 P1 (plan_error → E human_review) | NO Learn + audit | ItemPipelineRunner emit abort + 飞书卡 "❌ Plan LLM 5xx" |
 | **P3** PlanLLMCallPartialResponse (JSON 截断) | NO Execute | 同 P1 (plan_error → E human_review) | NO Learn + audit | ItemPipelineRunner emit abort + 飞书卡 "❌ Plan 输出不完整" |
 
-**Decision 映射表扩展**:现有 9 行(Verdict 4 态 × Other Conditions)扩展为 **10 行**,新增第 10 行:
+**Decision 映射表扩展**:现有 10 行(Verdict 4 态 × Other Conditions + D parent_rollup)扩展为 **11 行**,新增第 11 行:
 ```
 | plan_error | (Plan LLM 调用层失败) | E human_review | 飞书卡"❌" + emit abort | decision.kind=plan_error |
 ```
 
-**关键设计**:Plan error 时无 Verdict,Decision 节点通过**单独的 plan_error 入口**(由 ItemPipelineRunner 调用,不经 9 行映射表)直接触发 E human_review。这与现有 Verdict-based 决策正交,避免污染 9 行语义。
+**关键设计**:Plan error 时无 Verdict,Decision 节点通过**单独的 plan_error 入口**(由 ItemPipelineRunner 调用,不经 10 行 Verdict-based 映射表)直接触发 E human_review。这与现有 Verdict-based 决策正交,避免污染 10 行语义。
 
 #### 决策 2:Parse Reject 重试与降级策略(P4-P17)
 
@@ -624,7 +627,7 @@ Verify (节点 4) + Decision (节点 5) 两个独立 stage
 | **PriorityHint** | 由 Plan LLM 自由给 | **PriorityHint 注入**:"高 priority 优先 EmitPartial,低 priority 后跑" |
 | **Execute** | RunPlanDAG 4 worker | 同(无差异) |
 | **Verify** | PerCriterion + CustomLLMJudge | 同(无差异) |
-| **Decision** | 9 行映射表 | 同(无差异) |
+| **Decision** | 11 行映射表 | 同(无差异) |
 | **Learn** | 正常 Learn α++ | 同(无差异,但 Plan 路径信号更强,reputation 累积更快) |
 
 **关键设计**:force_plan 仅修改 Plan 节点的 prompt 注入,**不修改 Execute / Decision / Learn 节点**。这样保持 D7 6 节点流水线的对称性,Plan 节点的特殊化逻辑集中在一个地方。
@@ -634,8 +637,8 @@ Verify (节点 4) + Decision (节点 5) 两个独立 stage
 | S-E 子段 | Decision 触发? | decision.kind |
 |---------|--------------|---------------|
 | **seg_a (fast-path)** | **NO**(跳过 Decision 节点) | (无 decision) |
-| **seg_b (verified)** | 走 9 行映射表 | A accept |
-| **parent rollup (聚合 seg_a + seg_b)** | 走 9 行映射表 | **A accept (整体 1 个)** |
+| **seg_b (verified)** | 走 10 行 Verdict-based 映射表 | A accept |
+| **parent rollup (聚合 seg_a + seg_b)** | 走 10 行 Verdict-based 映射表 | **A accept (整体 1 个)** |
 
 **S-E 整体 decision.kind = accept × 1**(parent rollup 统一决策,不是 accept × 2)。
 

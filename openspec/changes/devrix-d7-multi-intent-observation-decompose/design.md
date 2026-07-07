@@ -67,7 +67,7 @@
                                             ↓
                                  ┌──────────────────────────────────┐
                                  │     D7 Decision (节点 5)          │
-                                 │  9 行静态映射表 (< 5ms, 0 LLM)    │
+                                 │  11 行静态映射表 (< 5ms, 0 LLM)   │
                                  │   → 5 路径决策 (A/B/C/D/E)       │
                                  └──────────┬───────────────────────┘
                                             ↓
@@ -113,8 +113,8 @@ Plan
 | **1. Observe** | User directive | IntentSegmentSet + ObservationReport | LlmIntentSegmenter (timeout 800ms) → fallback RuleBasedSegmenter |
 | **2. Plan** | Observe 输出 | PlanDAG + PlanLLMOutput(含 AC[])+ rationale | StrategicPlanProposer + validateDAG + 3-shot example |
 | **3. Execute** | PlanDAG | Artifact(per-segment)+ partial emit | WaveScheduler.RunPlanDAG + 4 worker hard cap |
-| **4. Verify** | Artifact + AC[] | PerCriterionVerdict[] + OverallVerdictKind | PerCriterion executor(本地机械 + CustomLLMJudge ≤ 3) |
-| **5. Decision** | Verdict + AC[] + RoundMeta | Decision{Kind, Reason, NextWorkItemSpec?} | 9 行静态映射表(< 5ms, 0 LLM) |
+| **4. Verify** | Artifact + AC[] | PerCriterionVerdict[] + VerdictKind | PerCriterion executor(本地机械 + CustomLLMJudge ≤ 3) |
+| **5. Decision** | Verdict + AC[] + RoundMeta | Decision{Kind, Reason, NextWorkItemSpec?} | 11 行静态映射表(10 Verdict-based + 1 plan_error,< 5ms, 0 LLM) |
 | **6. Learn** | Decision + Verdict + ArtifactHash | BayesianUpdate + reputation row | AsyncLearner(异步,enqueue < 1ms) |
 
 **链路**:1→2→3→4→5→6,Decision A 路径终止于 Learn(emit final),B/C 路径回到 1-4 循环,D 触发 parent rollup 节点,E 飞书 abort + 仍进 Learn。
@@ -309,6 +309,10 @@ Plan
   - 缺 AC → `ErrPlanLLMOutputMissingAC` + 提示"每个 node 至少 1 Required"
   - validateDAG 失败 → `PlanParseReject` + Plan LLM 重试 ≤ 2 次
   - 累计耗时 > 4s → `ErrPlanLLMIOBudgetExceeded` → 降级
+- **错误码注册 (M4 修复,2026-07-07)**:所有本 Change 新增错误(共 ~15 个,见上 §2.8 / §2.9 / §2.10 / §2.11 / §2.12 / §2.14 / §2.17)必须按现有 SentinelError 模式注册到 `internal/shared/errors/` 目录的 `orchestration.go`(NEW,与 `llm.go` / `multiagent.go` 同级),具体:
+  - `errors.New("d7 orchestration xxx")` 形式定义 sentinel
+  - `CodeD7Xxx = "ORC_7XXX"` 常量对应(7xxx 段是 D7 域前缀)
+  - 与 APICodeProvider duck-typing 集成(IM 差异化文案 + HTTP status 映射复用 `devrix-api-error-classification` S7_Archived DM-20260628-001 的 7 类闭集模式)
 - 性能影响:3-shot example ~3KB prompt,单次 Plan LLM 调用延迟 +100-200ms。
 
 ### 2.9 模块 9:VerifyLLMIO(Verify ↔ LLM 输入输出契约)
@@ -324,7 +328,7 @@ Plan
   }
   type VerifyLLMOutput struct {
       PerCriterionVerdicts []PerCriterionVerdict  // 顺序对齐 criteria
-      OverallVerdict       OverallVerdictKind      // Pass | Partial | Fail | Indeterminate
+      OverallVerdict       VerdictKind      // Pass | Partial | Fail | Indeterminate
       Evidence             string
   }
   type PerCriterionVerdict struct {
@@ -333,13 +337,10 @@ Plan
       Evidence    string
       Error       string
   }
-  type OverallVerdictKind string
-  const (
-      OverallPass           OverallVerdictKind = "pass"
-      OverallPartial        OverallVerdictKind = "partial"
-      OverallFail           OverallVerdictKind = "fail"
-      OverallIndeterminate  OverallVerdictKind = "indeterminate"
-  )
+  // VerdictKind 复用 internal/shared/types/verdict.go 已定义的 uint8 枚举
+  // (VerdictPass=0 / VerdictPartial=1 / VerdictIndeterminate=2 / VerdictFail=3),
+  // wire 格式 "pass" / "partial" / "indeterminate" / "fail"。
+  // 这里不再重复定义,直接 import 使用。
   ```
 - 数据结构:
   - 输入 schema:`verify_llm_input_v1.json` — i18n prompt appendix 强制
@@ -410,7 +411,7 @@ Plan
       LLMJudge Invoker  // D3 llmgateway 注入,只有 CustomLLMJudge 用
   }
   func (e *PerCriterionExecutor) Execute(ctx, artifact, acs []AcceptanceCriterion) ([]PerCriterionVerdict, error)
-  func (e *PerCriterionExecutor) Aggregate(verdicts []PerCriterionVerdict) OverallVerdictKind
+  func (e *PerCriterionExecutor) Aggregate(verdicts []PerCriterionVerdict) VerdictKind
   ```
 - 执行逻辑:
   1. 对每条 AC dispatch 到对应 CheckKind executor
@@ -419,10 +420,10 @@ Plan
   4. 顺序对齐返回 PerCriterionVerdict[]
 - 聚合规则(Plan ↔ Verify 验收聚合):
   ```
-  ∃ Required Fail        → OverallFail
-  全部 Required Pass + ∃ Preferred Fail → OverallPartial
-  全部 Pass              → OverallPass
-  任一 Error 且无 Fail    → OverallIndeterminate
+  ∃ Required Fail        → VerdictFail
+  全部 Required Pass + ∃ Preferred Fail → VerdictPartial
+  全部 Pass              → VerdictPass
+  任一 Error 且无 Fail    → VerdictIndeterminate
   ```
 - 错误处理:
   - 单条 AC Error → 继续其它 AC,不全 fail
@@ -457,7 +458,7 @@ Plan
       MaxBudget          int                 // 上限 2
   }
   type DecisionNode interface {
-      Decide(ctx, verdict OverallVerdictKind, acs []AcceptanceCriterion,
+      Decide(ctx, verdict VerdictKind, acs []AcceptanceCriterion,
              verdicts []PerCriterionVerdict, meta RoundMeta) (Decision, error)
   }
   type RoundMeta struct {
@@ -527,16 +528,24 @@ Plan
   ```go
   // LearnRequest 接收节点 5(Decision) + 节点 4(Verify) + 节点 3(ArtifactHash) 的输出
   type LearnRequest struct {
-      WorkItemID   string                  // per-segment attribution
-      Decision     Decision                // 来自节点 5,5 路径决策
-      Verdict      Verdict                 // 来自节点 4,Kind/SourceID/Confidence/Evidence
-      ArtifactHash string                  // 可选,来自节点 3,防重
+      WorkItemID        string                  // per-segment attribution
+      Decision          Decision                // 来自节点 5,5 路径决策
+      Verdict           Verdict                 // 来自节点 4,Kind/SourceID/Confidence/Evidence/IndeterminateReason
+      ArtifactHash      string                  // 可选,来自节点 3,防重
+      PlanRationaleHash string                  // ≤64B,SHA256[:16] hex,plan_rationale 的指纹(诊断用)
   }
   // 注:LearnRequest 不再收 Plan/Observations/ParentContext(契约精简)
   //   - Plan 输出已在 Plan 节点持久化,reputation 不需要冗余
   //   - Observations 已在 Observe 节点持久化,Learn 不消费
   //   - ParentContext 改为 Learn 内部通过 Decision.parent_rollup 触发,
   //     从 Reputation DB SELECT child rows 后 sum,而不是 LearnRequest 携带
+  // Verdict.IndeterminateReason 关键性:区分 verifier_parse_failure vs env_limited,
+  //   - verifier_parse_failure: AssetBuilder 路由到 PendingAsset(等下轮补全);
+  //   - env_limited: 同上但语义略不同(环境受限 vs 解析失败),Evidence.go 仅对前者 β++;
+  //   - G8-1 修复扩展,2026-07-07 锁定为 LearnRequest 必带字段(防止契约反向破坏)。
+  // PlanRationaleHash (H1 修复):不存全量 plan_rationale 字符串(可能 1-2KB,Learn 异步队列单条 LearnRequest 内存膨胀),
+  //   只存 16 字节 SHA256 指纹(hex 64B),用于 reputation.metadata.rationale_hash 关联 + 诊断时反查 DB。
+  //   plan_rationale 全量文本本身已由 Plan 节点持久化,reputation 不冗余。
 
   type LearnResponse struct {
       UpdatedAlpha    float64
@@ -669,6 +678,7 @@ Plan
 - 错误处理:
   - Plan 错误 NO Learn 时,记 `audit_log{event="plan_error_no_learn", plan_error=E1/E2/E4-pre}` + metric `plan_error_no_learn++`
   - user-cancel/accept 通过 `feishu.UserActionEvent` 触发,在 D1 ingress 边界调用 `AsyncLearner.Enqueue` (SourceID 加前缀)
+  - **user-cancel rate-limit (H2 修复,2026-07-07)**:24h 滑动窗口内同一 `segment_id` 累计 ≥ 3 次 user-cancel → 进入 `audit_hold` 状态(只 audit 不 β++),metric `user_cancel_audit_hold++`。理由:避免用户误点/手抖/恶意点击导致 reputation 雪崩;`audit_hold` 让管理员人工确认是否真要降级该 segment。Configurable:`devrix.yaml → user_cancel_rate_limit_max: 3`(默认) + `user_cancel_window_hours: 24`(默认)。
   - L1 DB 写挂:100ms 间隔重试 3 次,最终 `slog.Warn("learn_failed")` + metric `learn_failed_total++`
   - L2 队列满:enqueue 等待 ≤ 5ms 后降级 `Sync.Learn` + metric `learn_queue_full_fallback_total++`
   - L3 未 Drain:`session.DeferToNextSession(req)` + metric `learn_deferred_total++`
@@ -676,14 +686,16 @@ Plan
   - classifyScenario 纯函数:`< 1μs`
   - LearnPolicy.ShouldEnqueue + BayesianAction:合计 `< 10μs`
   - audit log 写入:同步 1-5ms,不阻塞主流程(可在 defer goroutine)
+- **D5 observability 注册 (M3 修复,2026-07-07)**:本节所有新增 metric(`plan_error_no_learn++` / `user_cancel_audit_hold++` / `learn_failed_total++` / `learn_queue_full_fallback_total++` / `learn_deferred_total++` / `learn_emitted_after_emit_failure` 等共 6 个)必须注册到 `internal/layers/observability/instrument/metrics/registry.go` 的 `Meter` 列表,与 D5 现有 metrics 同源,Otel SDK 上报到 Grafana。命名规范:`d7.<scenario>.<event>` 前缀(如 `d7.learn.failed` / `d7.user_cancel.audit_hold`),便于 dashboard filter。
 - 测试:
   - 22 场景单元测试(spec_delta AC43-AC54 验收)
   - 6 维度并发压测(每维度 ≥ 100 round)
   - L1/L2/L3 故障注入(模拟 DB busy / chan 满 / ctx timeout)
+  - **metric 注册测试**:每个 metric 在 registry.go 中存在 + 单元测试断言调用后 counter++
 
 ### 2.17 模块 17:Plan 字段验证 + Parse Reject 重试 + Decision plan_error 新路径(Plan 26 场景全覆盖)
 
-- 修改文件:`mups/plan/plan_validator.go` (NEW,字段级验证)+ `mups/plan/reject_retry.go` (NEW,重试 + 降级)+ `mups/sessionorchestrator/plan_error_decision.go` (NEW,plan_error 决策入口)
+- 修改文件:`plan/plan_validator.go` (NEW,字段级验证)+ `plan/reject_retry.go` (NEW,重试 + 降级)+ `sessionorchestrator/plan_error_decision.go` (NEW,plan_error 决策入口)
 - 关键 API:
   ```go
   // PlanAcceptanceContractBuilder 字段级验证(扩展 §2.11)
@@ -726,7 +738,7 @@ Plan
   - RetryWithFeedback LLM 调用:每次 1-3s,共 ≤ 2 次
   - PlanErrorDecision.Decide 纯函数:`< 1μs`
 - 测试:
-  - 26 场景单元测试(spec_delta AC55-AC66 验收)+ 1 条 AC67 验证 Decision 10 行映射表扩展
+  - 26 场景单元测试(spec_delta AC55-AC66 验收)+ 1 条 AC67 验证 Decision 11 行映射表扩展(10 baseline + 1 plan_error)
   - PlanFieldValidator 8 字段级测试 + 6 ParseReject 子类测试
   - RetryWithFeedback mock LLM 测试重试 ≤ 2 次上限
   - PlanErrorDecision 3 错误类型测试

@@ -1,8 +1,9 @@
 # Tasks: D7 multi-intent observation decompose + Plan DAG + parallel Execute
 
 **Change ID:** `devrix-d7-multi-intent-observation-decompose`
-**Total Tasks:** 33
+**Total Tasks:** 59 (T01-T52 = 47 base + T60-T65 = 6 Learn 22-scenario + T66-T72 = 7 Plan 26-scenario,minus 1 deprecated = 60 - 1 = 59)
 **Sprint:** devrix-d7-v7
+**PRs:** 7 (PR-A1 grammar → PR-A2 AC contract + LLM IO → PR-B WaveScheduler+Decision+Sub-Worker → PR-C streaming+idempotency → PR-D config+e2e+verify-archive → PR-E Learn+22-scenario → PR-F Plan+26-scenario)
 
 ---
 
@@ -61,7 +62,7 @@
 
 ## P0-3.5 Plan ↔ Verify 验收契约(AcceptanceCriteria + PerCriterion)
 
-**File:** `internal/layers/orchestration/plan/acceptance_criteria.go` (NEW) + `internal/layers/orchestration/verify/per_criterion.go` (NEW)
+**File:** `internal/layers/orchestration/plan/acceptance_criteria.go` (NEW) + `internal/layers/orchestration/executionflow/verify/per_criterion.go` (NEW)
 **Effort:** 2.0 人天
 **AC:** AC25, AC27-AC28, AC11.1-AC11.3
 
@@ -71,14 +72,14 @@
 | T32 | `PerCriterionVerdict` type(CriterionID, Outcome, Evidence, Error) + aggregate() 4 路径 | TODO |
 | T33 | `PlanNode.AcceptanceCriteria []AcceptanceCriterion` 字段(扩 §3.5) | TODO |
 | T34 | `PlanAcceptanceContractBuilder.Build(dag, ac)` 一致性校验(NodeCoverageMissing / DuplicateCriterionID / ∀ Node ≥ 1 Required) | TODO |
-| T35 | Verify 节点接收 AC[] + Artifact → PerCriterionVerdict[];聚合 OverallVerdictKind 落 round.Metadata["ac_verdicts"] | TODO |
+| T35 | Verify 节点接收 AC[] + Artifact → PerCriterionVerdict[];聚合 VerdictKind 落 round.Metadata["ac_verdicts"] | TODO |
 | T36 | 机械 CheckKind(ContainsString/NotContains/NumericRange/LengthRange/MentionsAll/MentionsAny/JSONPath)本地执行,LLM 调用为 0 | TODO |
 | T37 | CustomLLMJudge CheckKind 走 D3 llm 调用,judge_prompt 含 plan_rationale + criterion.Description + artifact | TODO |
 | T38 | Verify short-circuit:0 CustomLLMJudge 时 Verify 不调 LLM,延迟 < 50ms | TODO |
 
 ## P0-4.5 PlanLLMIO + VerifyLLMIO 完整协议
 
-**File:** `internal/layers/contextengine/i18n/format_hints_mups.go` (MODIFIED,Plan/Verify appendix) + `internal/layers/orchestration/plan/llm_io.go` (NEW) + `internal/layers/orchestration/verify/llm_io.go` (NEW)
+**File:** `internal/layers/contextengine/i18n/format_hints_mups.go` (MODIFIED,Plan/Verify appendix) + `internal/layers/orchestration/plan/llm_io.go` (NEW) + `internal/layers/orchestration/executionflow/verify/llm_io.go` (NEW)
 **Effort:** 2.0 人天
 **AC:** AC9, AC12, AC26-AC27, AC10 (feedback loop)
 
@@ -153,17 +154,17 @@
 
 ## P0-10 Decision Node(D7 6 节点流水线新增独立第 5 stage)
 
-**File:** `internal/layers/orchestration/verify/decision_node.go` (NEW) + `internal/layers/orchestration/sessionorchestrator/child_workitem.go` (NEW) + `internal/layers/orchestration/workmodel/child.go` (MODIFIED)
+**File:** `internal/layers/orchestration/executionflow/verify/decision_node.go` (NEW) + `internal/layers/orchestration/sessionorchestrator/child_workitem.go` (NEW) + `internal/layers/orchestration/workmodel/child.go` (MODIFIED)
 **Effort:** 2.5 人天
 **AC:** AC29-AC34 (新增)
 
 | ID | Description | Status |
 |---|---|---|
 | T46 | `DecisionKind` 5 路径枚举(accept / retry / child_worker / parent_rollup / human_review)+ Validate() | TODO |
-| T47 | `DecisionNode.Decide(ctx, verdict, acs, verdicts, meta) (Decision, error)` 接口 + 9 行静态映射表 | TODO |
+| T47 | `DecisionNode.Decide(ctx, verdict, acs, verdicts, meta) (Decision, error)` 接口 + 11 行静态映射表(10 Verdict-based + 1 plan_error) | TODO |
 | T48 | `ChildWorkItemSpec` 类型(ParentWorkItemID / SubSegmentIDs / InheritACSubset / MaxBudget=2)+ 校验 | TODO |
 | T49 | `SubWorkerSpawner.SpawnChild(ctx, spec) (*WorkItem, error)` + `OnChildComplete` 触发 parent decision 重算 | TODO |
-| T50 | Decision 5 路径单元测试(9 行映射表全测覆盖)+ 边界(降级 / budget=0 / sibling 未齐) | TODO |
+| T50 | Decision 5 路径单元测试(11 行映射表全测覆盖)+ 边界(降级 / budget=0 / sibling 未齐) | TODO |
 | T51 | Decision 持久化:round.Metadata["decision"] = JSON{kind, reason, next_spec} + reputation.metadata.decision_kind | TODO |
 | T52 | E2E LP-4 decision-pending test:发 partial-fail-prone 指令 → 验证 Decision=child_worker 触发 + 子 AC[] 复用 + parent rollup 触发 D 决策 | TODO |
 
@@ -177,7 +178,7 @@
 |---|---|---|
 | T53 | `LearnRequest` 类型精简(仅收 WorkItemID + Decision + Verdict + ArtifactHash 可选,不收 Plan/Observations/ParentContext) | TODO |
 | T54 | `LearnResponse` 类型 + `BayesianAction` 4 枚举(alpha_bump / beta_bump / no_change / force_plan) | TODO |
-| T55 | `ReputationRow` 类型 + DB schema 10 字段(plan_rationale 字段弃用)+ migration | TODO |
+| T55 | `ReputationRow` 类型 + DB schema **11 字段**(plan_rationale **deprecated** → 迁移到 metadata.rationale,保留列只为兼容旧 row)+ migration | TODO |
 | T56 | `BayesianUpdate` 纯函数(α++/β++/retry 不累计/force_plan 触发)+ 单元测试覆盖 6 路径 | TODO |
 | T57 | `ParentEvidence` aggregator(Learn 内部按 Decision.parent_rollup 从 DB 查 child rows → sum → parent row)+ 边界(child 缺失降级) | TODO |
 | T58 | `AsyncLearner` 异步化(chan queue size=100, worker=2, Enqueue < 1ms 不阻塞, Drain 阻塞) | TODO |
@@ -200,7 +201,7 @@
 
 ## P0-12 Plan 节点 26 场景全覆盖(Plan 字段验证 + Parse Reject 重试 + Decision plan_error 新路径)
 
-**File:** `internal/layers/orchestration/mups/plan/plan_validator.go` (NEW) + `mups/plan/reject_retry.go` (NEW) + `mups/sessionorchestrator/plan_error_decision.go` (NEW) + `mups/plan/plan_field_validator_test.go` (NEW)
+**File:** `internal/layers/orchestration/plan/plan_validator.go` (NEW) + `plan/reject_retry.go` (NEW) + `sessionorchestrator/plan_error_decision.go` (NEW) + `plan/plan_field_validator_test.go` (NEW)
 **Effort:** 2.0 人天
 **AC:** AC55-AC67 (新增)
 
@@ -210,7 +211,7 @@
 | T67 | `PlanParseReject` 扩展 6 子类(RejectEmptyChildren / RejectEmptyDAG / RejectInvalidCheckKind / RejectRequiredZero / RejectPrioritiesOutOfRange / RejectSegmentIDMissing)+ 已有 6 子类合并共 12 子类 | TODO |
 | T68 | `RetryWithFeedback(ctx, priorProposal, reject)` 重试 Plan LLM ≤ 2 次 + CompactJSON 错误 feedback(同 §9 feedback_loop 3 子类模式)+ 超限 fallback DecomposeIntoChildren | TODO |
 | T69 | `PlanErrorDecision` 类型 + `Decide()` 直接 emit abort + 飞书卡 "❌ Plan 阶段失败" + NO Learn(metric `plan_error_no_learn++`)+ 3 错误类型(PlanLLMCallTimeout / PlanLLMCallError 5xx / PlanLLMCallPartialResponse) | TODO |
-| T70 | Decision 映射表扩展 9 行 → 10 行:新增第 10 行 `plan_error` → E human_review(正交于 Verdict-based 9 行) | TODO |
+| T70 | Decision 映射表扩展 10 行 → 11 行:新增第 11 行 `plan_error` → E human_review(正交于 Verdict-based 10 行 baseline) | TODO |
 | T71 | force_plan Plan 路径:PlanFieldValidator 读 `metadata.next_observation_force_plan=true` → Plan prompt 注入 "强制 Required AC[] ≥ 1" + PriorityHint | TODO |
 | T72 | 26 场景单元测试(`plan_field_validator_test.go`,8 字段级 + 6 ParseReject 子类 + 3 PlanErrorDecision + 2 force_plan + 1 S-E Decision 边界 = 20 核心 case + 6 维度并发压测) | TODO |
 
@@ -221,23 +222,29 @@
 - TODO: 59
 - 进度: 0%
 
-预估总 effort: **28.0 人天**,跨 5 PR。
+预估总 effort: **28.0 人天**,跨 **7 PR**(PR-A1 / PR-A2 / PR-B / PR-C / PR-D / PR-E / PR-F)
 
 新增 Learn Node 节点对原 PR 拆分的影响:
-- PR-A(grammar/SpawnPolicy):T01-T04, T10-T14, T31-T38(AC grammar + DAG type)→ 不变
+- **PR-A1(grammar/SpawnPolicy,H4 拆分)**:T01-T04, T10-T14(7 T 点,IntentSegment grammar + PlanDAG grammar + DAG validator + SpawnPolicy)→ **拆 PR-A1(grammar only)**
+- **PR-A2(AC contract + LLM IO,H4 拆分)**:T31-T45(15 T 点,AcceptanceCriterion + PerCriterion + PlanLLMIO + VerifyLLMIO + feedback loop)→ **拆 PR-A2(AC contract + LLM IO)**
 - PR-B(WaveScheduler DAG executor):T18-T21, T46-T49(Decision + Sub-Worker Spawn)→ +2.5 人天
 - PR-C(streaming + idempotency):T22-T28 → 不变
 - PR-D(config flag + e2e + verify-archive):T29-T30, T50-T52 → +1.0 人天(decision 单元测试 + LP-4)
 - **PR-E(Learn Node 升格 + 异步化 + 22 场景覆盖)**:T53-T65(13 T 点, 4.5 人天)→ **新 PR**
 
-预估总 effort: **28.0 人天**,跨 **6 PR**(新增 PR-F)
+预估总 effort: **28.0 人天**,跨 **7 PR**(PR-A1 + PR-A2 + PR-B + PR-C + PR-D + PR-E + PR-F)
+
+**H4 拆分理由**:原 PR-A 一锅端 17 T 点过重(2.5 周工作量),review diff 大 + rollback 风险高。
+- PR-A1 = grammar-only(类型 + validator + SpawnPolicy),7 T 点,1.0 人天,快速建立基础;
+- PR-A2 = AC contract + LLM IO 合并,15 T 点,3.0 人天,在 PR-A1 基础上叠加契约 + LLM 协议。
+- 两 PR 解耦,任一失败不影响另一;PR-A2 可等 PR-A1 review 通过后再开。
 
 **PR-F 工作量明细**:
 - T66 PlanFieldValidator 字段级校验 8 子类:0.3 人天
 - T67 PlanParseReject 扩展 6 子类合并:0.2 人天
 - T68 RetryWithFeedback 重试 ≤ 2 次 + fallback DecomposeIntoChildren:0.4 人天
 - T69 PlanErrorDecision emit abort + NO Learn:0.2 人天
-- T70 Decision 9 行 → 10 行映射表扩展:0.2 人天
+- T70 Decision 10 行 → 11 行映射表扩展:0.2 人天
 - T71 force_plan Plan 注入 Required AC[] + PriorityHint:0.3 人天
 - T72 26 场景单元测试 + 6 维度并发压测:0.4 人天
 
@@ -261,6 +268,6 @@ PR-E 工作量明细:
   - T67 PlanParseReject 扩展 6 子类合并:0.2 人天
   - T68 RetryWithFeedback 重试 ≤ 2 次 + fallback DecomposeIntoChildren:0.4 人天
   - T69 PlanErrorDecision emit abort + NO Learn:0.2 人天
-  - T70 Decision 9 行 → 10 行映射表扩展:0.2 人天
+  - T70 Decision 10 行 → 11 行映射表扩展:0.2 人天
   - T71 force_plan Plan 注入 Required AC[] + PriorityHint:0.3 人天
   - T72 26 场景单元测试 + 6 维度并发压测:0.4 人天

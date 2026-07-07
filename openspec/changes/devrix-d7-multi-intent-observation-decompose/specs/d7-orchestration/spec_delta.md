@@ -5,6 +5,42 @@
 
 ---
 
+## 章节导航索引(2026-07-07 S3-Gate review fix)
+
+**说明**:本 spec_delta 因多次增量更新,章节编号呈现**插入式分布**(§3.5/§3.6/§3.7/§3.8/§3.9/§3.10/§3.11/§3.12/§3.13/§3.14 散落各处)。为方便阅读,以下索引表给出**逻辑顺序**与**物理位置**映射。
+
+| 逻辑章节 | 物理位置 | 内容 | 物理位置行号 |
+|---------|---------|------|-------------|
+| §1 | §1 | IntentSegment (new type) | line 8 |
+| §2 | §2 | IntentSegmentSet (new type) | line 43 |
+| §3 | §3 | PlanDAG (new type) | line 67 |
+| §4 | §4 | SpawnPolicy (updated) | line 198 |
+| §5 | §5 | Feature Flag d7.dag_executor.enabled (new) | line 214 |
+| §6 | §6 | WaveScheduler RunPlanDAG (new behavior) | line 227 |
+| §7 | §7 | Stream Emit Idempotency (new behavior) | line 247 |
+| §8 | §3.5 | **AcceptanceCriterion** (new type, Plan↔Verify 契约) | line 103 |
+| §9 | §3.6 | **PerCriterionVerdict** (new type, Verify 产出) | line 163 |
+| §10 | §11 | PlanNode (updated, AddCriteria 字段) | line 584 |
+| §11 | §12 | PlanAcceptanceContractBuilder (new helper) | line 598 |
+| §12 | §3.7 | **Decision** (new type, 5 路径枚举) | line 616 |
+| §13 | §3.8 | **ChildWorkItemSpec** (new type, sub-task spec) | line 653 |
+| §14 | §3.9 | **LearnRequest** (new type, 精简契约) | line 779 |
+| §15 | §3.10 | **LearnResponse** (new type) | line 819 |
+| §16 | §3.11 | **ReputationRow** (new type, DB schema) | line 851 |
+| §17 | §9 | PlanLLMIO (new IO contract) | line 464 |
+| §18 | §10 | VerifyLLMIO (new IO contract) | line 526 |
+| §19 | §13 | DecisionNodeIO (new IO contract) | line 689 |
+| §20 | §14 | LearnNodeIO (new IO contract) | line 912 |
+| §21 | §3.12 | **Learn 22-scenario coverage** (new scenarios section) | line 342 |
+| §22 | §3.13 | **Plan 26-scenario coverage** (new scenarios section) | line 388 |
+| §23 | §3.14 | **Decision 11-row mapping extension** (new scenarios section) | line 435 |
+
+**Acceptance Criteria** 章节(原 line 270)已**移到末尾**(见 "Acceptance Criteria (S5 验收)" at the end before Affected Files),保持 §1-§23 主体连续。
+
+**重构计划**:S4 实现阶段将本 spec_delta 合并到主 `openspec/specs/d7-orchestration/spec.md` (lite-mode) + `CHANGELOG.md`,消除章节散落问题。当前为保持 git diff 可追溯,暂保留插入式编号。
+
+---
+
 ## 1. New Type: IntentSegment
 
 ```yaml
@@ -178,6 +214,14 @@ schema:
     - name: Outcome
       type: enum {Pass, Fail, Skipped, Error}
       required: true
+      note: |
+        - Pass: 机械 CheckKind 命中 / LLM judge 通过
+        - Fail: 机械 CheckKind 未命中 / LLM judge 拒绝
+        - Error: CheckKind 执行异常(LLM timeout / JSON parse fail 等),
+                 区别于 Fail(语义错),Err 是执行失败
+        - Skipped: **当前保留未使用**(v1 不产出,留给 v2 sub-criterion
+                 复用 AC subset 时跳过非目标 AC 的场景);当前 aggregation
+                 规则假定 Skipped 不出现,若出现按 Error 处理(防歧义)
     - name: Evidence
       type: string
       required: false
@@ -187,10 +231,10 @@ schema:
       required: false
       description: Error 状态下的具体错误
 aggregation_rule: |
-  - ∃ Required criterion with Outcome=Fail → OverallVerdictKind = VerdictFail
-  - 所有 Required criterion Pass 且 ∃ Preferred criterion Fail → OverallVerdictKind = VerdictPartial
-  - 全部 Pass → OverallVerdictKind = VerdictPass
-  - 任一 Error 且无 Fail → OverallVerdictKind = VerdictIndeterminate
+  - ∃ Required criterion with Outcome=Fail → VerdictKind = VerdictFail
+  - 所有 Required criterion Pass 且 ∃ Preferred criterion Fail → VerdictKind = VerdictPartial
+  - 全部 Pass → VerdictKind = VerdictPass
+  - 任一 Error 且无 Fail → VerdictKind = VerdictIndeterminate
 ```
 
 ---
@@ -266,78 +310,6 @@ delta: |
 ```
 
 ---
-
-## Acceptance Criteria (S5 验收)
-
-| AC | Description | Pass Criterion |
-|----|-------------|----------------|
-| AC1 | IntentSegment grammar 完整 | 新增测试覆盖 4 种 kind + 边界 |
-| AC2 | IntentSegmentSet 容器 invariants | len ≥ 1 enforced |
-| AC3 | SpawnPolicy.DecomposeByIntentSegments | string-tagged union 通过测试 |
-| AC4 | IntentSegmenter interface + dispatcher | LLM 超时 fallback 验证 |
-| AC5 | LLMIntentSegmenter 6-shot prompt | 端到端 multi-intent directive 切出 ≥ 2 segments |
-| AC6 | RuleBasedSegmenter regex 兜底 | "X + Y" / "X?另外 Y" 命中 |
-| AC7 | PlanNode + DataEdge + PlanDAG 类型 | nil safety + JSON 序列化 |
-| AC8 | validateDAG 4 类错误 | Cycle / TooManyNodes / DuplicateNode / DanglingEdge |
-| AC9 | PlanDAG JSON schema 在 LLM prompt | 解析 + validate 通过 |
-| AC10 | PlanParseReject JSON feedback | LLM 重试 ≤ 2 收敛 |
-| AC11 | StrategicPlanProposal.DAG 字段 | 与 Children 并存,空 DAG 退回 |
-| AC12 | Plan prompt DAG schema + 3-shot | Plan LLM 能产出 PlanDAG |
-| AC13 | RunPlanDAG 接口签名 | channel close 语义正确 |
-| AC14 | 4 worker pool + ready queue | priority 高先跑 |
-| AC15 | error propagation + Drain emit | cancel 未启动 sibling |
-| AC16 | context cancel 终止 | goroutine leak 0 |
-| AC17 | ItemPipelineRunner.Run DAG forwarding | DAG != nil → RunPlanDAG |
-| AC18 | Stream emit idempotency key | 重复 emit noop |
-| AC19 | parent rollup emit final | 覆盖 partial |
-| AC20 | Learn per-segment + ParentEvidence | α/β 累积正确 |
-| AC21 | EmitPartial/EmitFinal feishu API | partial + final card 测试 |
-| AC22 | in-memory dedup table | 重复调不发重复卡 |
-| AC23 | feature flag off 零行为变化 | 旧 Plan 路径回归 |
-| AC24 | E2E LP-3 multi-intent | 飞书 2 张卡片 + 正确 finalText |
-| AC25 | PlanNode 携带 AcceptanceCriteria[] | 解析后 Validate(args per CheckKind)0 error |
-| AC26 | Plan 节点 3-shot example 产出含 AC 的 PlanDAG | 端到端 multi-segment 测试中 AC[] non-empty |
-| AC27 | Verify 节点接收 AC[] 产出 PerCriterionVerdict[] | aggregation_rule 4 路径全测 |
-| AC28 | PerCriterionVerdict + Per-Criterion Evidence 持久化 | round.Metadata["ac_verdicts"] JSON 可读 |
-| AC29 | Decision Node 5 路径决策表 | Verdict 4 态 × RoundMeta 9 行映射全测 |
-| AC30 | Decision 输出持久化 | round.Metadata["decision"] JSON{kind, reason} 可读 |
-| AC31 | Decision B 重试上限 | AttemptNo >= MaxRetry=1 → 降级 E,不再 retry |
-| AC32 | Decision C 子 Worker 上限 | ChildBudgetRemaining=0 → 降级 A 接受 |
-| AC33 | Decision D 父 rollup 触发 | IsChildSegment + SiblingDecidedCount==SiblingTotalCount 才触发 |
-| AC34 | Decision E 人工触发 | RiskLevel=high + VerdictIndeterminate/Fail-retry 触发,飞书卡标"❓" |
-| AC35 | LearnRequest.WorkItemID 字段 | per-segment attribution 验证 |
-| AC36 | per-segment BayesianUpdate 公式 | α++ on Pass / β++ on Fail / retry 不累计 全测 |
-| AC37 | ParentEvidence aggregator | sum child α/β → parent reputation row 验证 |
-| AC38 | decision_kind 入 reputation metadata | reputation_row metadata 含 5 种 DecisionKind |
-| AC39 | force_plan 触发条件 | β/(α+β) > 0.7 → BayesianAction=force_plan |
-| AC40 | Learn 异步不阻塞 | emit final 后再 enqueue Learn,主流程延迟 < 5ms |
-| AC41 | reputation_row 持久化 | DB schema 11 字段 + 跨 session α/β 累加 |
-| AC42 | artifact_metadata_hash 去重 | 同一 artifact 重复 learn → no_change |
-| **AC43** | **Learn 22 场景覆盖 (基础 5)** | **S-A~S-E 5 场景 enqueue 路径 + α_bump 累计 + 父 rollup sum (决策 1+3)** |
-| **AC44** | **上游错误 NO Learn (Plan 阶段)** | **E1/E2/E4-pre:Plan 错误不 Learn,仅 audit log + metric `plan_error_no_learn++` 全测覆盖** |
-| **AC45** | **上游错误正常 Learn (Execute/Verify 阶段)** | **E3/E5/E6:VerdictFail/SystemAnomaly β++;E4-post:last good α++;reputation row 持久化验证** |
-| **AC46** | **user-cancel Learn β++** | **U1:feishu UserActionEvent 触发,SourceID="user_cancel:seg_a_id",β++ 全测覆盖** |
-| **AC47** | **user-accept Learn α++ fast-track** | **U2:feishu UserActionEvent 触发,SourceID="user_accept:seg_a_id",α++ 不等下次 trigger** |
-| **AC48** | **user-modify 本轮不 Learn** | **U3:feishu modify 事件不调用 AsyncLearner.Enqueue,下轮 directive 重新走完整 6 节点** |
-| **AC49** | **force_plan 触发条件** | **F1:β/(α+β) > 0.7 → BayesianAction=force_plan + 写 metadata.next_observation_force_plan=true;下次 Observe 读 metadata 降级 Plan** |
-| **AC50** | **force_plan 下次降级 Plan 路径** | **F2:下次 directive 走 Plan 路径(不再 fast-path),enqueue α++ (信号更强) 全测** |
-| **AC51** | **Learn 失败 silent retry (L1)** | **L1:DB 写挂 retry 3 次(100ms 间隔)+ 最终 slog.Warn,不阻塞 emit final,metric `learn_failed_total++`** |
-| **AC52** | **Learn 队列满降级 Sync (L2)** | **L2:AsyncLearner chan 100 满时降级 Sync.Learn + metric `learn_queue_full_fallback_total++` + enqueue 等待 ≤ 5ms** |
-| **AC53** | **Learn 未 Drain defer next session (L3)** | **L3:session 退出前 ctx timeout,DeferToNextSession marker 落盘,下次 session.Drain() 兜底 + metric `learn_deferred_total++`** |
-| **AC54** | **跨 session segment_id 复用 (C1) + emit 失败独立性 (X1)** | **C1:同 segment_id 跨 session 复用 reputation row,cold start Beta(5,3) → α=5+1=6;X1:emit 失败不影响 Learn enqueue,metric `learn_emitted_after_emit_failure=true` 区分** |
-| **AC55** | **Plan LLM 错误 (P1-P3) Decision plan_error 新路径** | **PlanLLMCallTimeout / 5xx / partial_response → Decision 新增 plan_error 入口 → E human_review,9 行 → 11 行映射表扩展** |
-| **AC56** | **Plan 字段异常 (P4-P11) PlanFieldValidator** | **空 Children / 空 DAG / DAG 0 nodes / AC CheckKind 越界 / AC Required=0 / priorities 越界 / segments ID 缺失 8 子类 PlanParseReject 拒绝** |
-| **AC57** | **Parse Reject (P12-P17) RetryWithFeedback ≤ 2 次 + fallback** | **6 类 Parse Reject + 6 字段级 Reject = 12 子类,RetryWithFeedback 重试 ≤ 2 次 + 超限 fallback DecomposeIntoChildren** |
-| **AC58** | **Plan fast-path 命中 (P18-P19) NO Execute / NO Decision** | **单/多确定性 fast-path 触发 → Plan 节点 short-circuit + ItemPipelineRunner 跳过 Execute / Decision,仅 Learn α++** |
-| **AC59** | **force_plan Plan 差异 (P20-P21) 强制 Required AC[] ≥ 1** | **PlanFieldValidator 读 metadata.next_observation_force_plan=true → Plan prompt 注入 "强制 Required AC[] ≥ 1" + PriorityHint** |
-| **AC60** | **降级路径 Execute/Verify/Learn (P4-P17 降级 P5)** | **DecomposeIntoChildren 顺序串行 Execute + fallback NumericRange Verify + 简化 Decision A accept + Learn α++ (SourceID="plan_legacy:...")** |
-| **AC61** | **Plan rationale 缺失 (P9) 可选字段** | **PlanFieldValidator 接受 rationale 缺失(可选)+ Execute/Decision 不变 + Learn metadata 缺字段 + audit log 警告** |
-| **AC62** | **Plan 空 Children (P4) / DAG 0 nodes (P6) emit abort** | **PlanFieldValidator 拒绝 → ItemPipelineRunner emit abort + 飞书卡 "❌ Plan DAG 为空" + NO Execute / NO Decision / NO Learn** |
-| **AC63** | **S-E Decision 边界 (P-S-E)** | **fast-path 部分跳过 Decision 节点,parent rollup 阶段对所有 child 统一 A accept,S-E 整体 1 个 decision.kind=accept** |
-| **AC64** | **Plan LLM 错误 emit abort (P1-P3)** | **ItemPipelineRunner emit abort + 飞书卡 "❌ Plan 阶段失败" + 详细错误信息(error_type + reason)** |
-| **AC65** | **Plan LLM 错误 NO Learn (P1-P3)** | **NO Learn + audit log `plan_error_no_learn++` + 与 Learn §5.6.1 决策 1 一致 (Plan 错误不 Learn)** |
-| **AC66** | **Plan retry 上限 (P4-P17)** | **RetryWithFeedback ≤ 2 次上限(同 §9 feedback_loop 3 子类模式),避免 LLM 循环死锁** |
-| **AC67** | **Decision 10 行 → 11 行映射表扩展** | **新增第 11 行 plan_error → E human_review,与现有 10 行正交(Plan error 时无 Verdict,直接走 plan_error 入口)** |
 
 ## 3.12 Learn Node 22 场景覆盖(NEW,§5.6.1 + §8.7.10 对应)
 
@@ -432,11 +404,11 @@ delta: |
 4. **S-E Decision 边界(P-S-E)**:fast-path 部分跳过 Decision,parent rollup 统一决策 A accept
 5. **Plan rationale 缺失(P9)**:可选字段,Execute/Decision 不变,Learn metadata 缺字段 + audit log 警告
 
-## 3.14 Decision 节点 10 行映射表扩展(NEW,§5.7.1 决策 1 对应)
+## 3.14 Decision 节点 11 行映射表扩展(NEW,§5.7.1 决策 1 对应)
 
-**问题**:之前 §3.7 Decision 节点定义 5 路径枚举 + 9 行映射表(Verdict 4 态 × Other Conditions),**未覆盖 Plan LLM 错误**(P1-P3),Plan 错误时无 Verdict。本节扩展 9 行 → **10 行**,新增第 10 行 plan_error 路径。
+**问题**:之前 §3.7 Decision 节点定义 5 路径枚举 + 10 行映射表(Verdict 4 态 × Other Conditions + D parent_rollup),**未覆盖 Plan LLM 错误**(P1-P3),Plan 错误时无 Verdict。本节扩展 10 行 → **11 行**,新增第 11 行 plan_error 路径。
 
-**10 行映射表**:
+**11 行映射表**:
 
 | # | Verdict / 触发源 | Other Conditions | Decision | 后续动作 | 持久化 |
 |---|----------------|-----------------|----------|---------|--------|
@@ -458,6 +430,8 @@ delta: |
 - 两条决策路径互不污染:Plan error 时无 Verdict,直接走 plan_error 路径;有 Verdict 时走 10 行映射表
 
 **AC 覆盖**:AC67 = "Decision 10 行映射表扩展为 11 行,新增第 11 行 plan_error → E human_review"
+
+**AC68 (NEW, LearnRequest contract C8 修复)**:LearnRequest.Verdict 字段必带 `IndeterminateReason`(枚举值:`""`、`"verifier_parse_failure"`、`"env_limited"`、`"interrupt"`、`"tombstone"` 等)。理由:G8-1 修复扩展已落地,`evidence.go:126` 仅对 `verifier_parse_failure` β++,`asset_builder.go:246` 读此字段路由到 PendingAsset。LearnRequest 缺此字段会**反向破坏 G8-1 修复**。锁定 2026-07-07,后续 LearnRequest 重构必须保留 IndeterminateReason。AC 映射:T25(T53 已有,补字段注释)+ T60。
 
 ---
 
@@ -531,8 +505,8 @@ owner: D7
 introduced: DM-20260707-001
 description: |
   Verify 节点 ↔ LLM 的输入输出契约。Verify LLM 拿 Artifact + Plan 提供的 AC[],
-  对每条 AC 产出 PerCriterionVerdict,最终聚合 OverallVerdictKind。
-  Verify 节点本地规则(ContainsString 等 CheckKind)LLM 不参与,只有 CustomLLMJudge
+  对每条 AC 产出 PerCriterionVerdict,最终聚合 VerdictKind。
+  Verify 节点本地规则(ContainsString/NotContains/MentionsAll/MentionsAny/Numeric/Length/JSONPath 等机械 CheckKind)LLM 不参与,只有 CustomLLMJudge
   才走 LLM 调用。
 inputs:
   VerifyLLMInput:
@@ -575,7 +549,8 @@ errors:
   - ErrVerifyLLMJudgeBudgetExceeded
 short_circuit:
   when: |
-    0 CustomLLMJudge AND PlanLLM Criteria 全是机械 CheckKind(Contains/NotContains/Numeric/Length/JSONPath)
+    0 CustomLLMJudge AND PlanLLM Criteria 全是机械 CheckKind
+    (ContainsString/NotContains/MentionsAll/MentionsAny/Numeric/Length/JSONPath,见 §3.5 枚举)
     then: Verify 节点本地跑,不调 LLM,延迟 < 50ms
 ```
 
@@ -622,7 +597,7 @@ lifecycle: stable
 introduced: DM-20260707-001
 description: |
   Decision 节点(D7 6 节点流水线独立第 5 stage)产出。5 路径决策枚举,决定"接下来做什么"。
-  Verify 节点(节点 4)产出 OverallVerdictKind 后,Decision 节点(节点 5)立即跑映射表,
+  Verify 节点(节点 4)产出 VerdictKind 后,Decision 节点(节点 5)立即跑映射表,
   产出 Decision{Kind, Reason, NextWorkItemSpec?}。
 schema:
   fields:
@@ -700,7 +675,7 @@ inputs:
   DecisionNodeInput:
     fields:
       - name: Verdict
-        type: OverallVerdictKind
+        type: VerdictKind
         required: true
         note: 来自 §3.6 PerCriterionVerdict aggregation 4 态
       - name: ACs
@@ -748,10 +723,10 @@ outputs:
         required: true
         schema: decision_v1.json
         constraint: |
-          - 决策映射表 9 行全测覆盖
+          - 决策映射表 11 行全测覆盖(10 baseline + 1 plan_error,见 §3.14)
           - 落 round.Metadata["decision"] = JSON{kind, reason, next_spec}
 decision_table:
-  rows: 9
+  rows: 11
   columns: [Verdict, OtherConditions, Decision]
   rows:
     - [Pass, "(default)", accept]
@@ -764,6 +739,7 @@ decision_table:
     - [Indeterminate, "RiskLevel=normal/low", retry]
     - ["Error(全Err)", "Network/Timeout 类", retry]
     - ["(任意)", "IsChildSegment + SiblingDecidedCount==SiblingTotalCount", parent_rollup]
+    - ["plan_error", "(Plan LLM timeout / 5xx / partial response)", human_review]
 errors:
   - ErrDecisionMapMiss (静态映射表未命中 → 降级 accept + log warning)
   - ErrChildWorkItemBudgetExhausted (ChildBudget=0 + Decision=child_worker)
@@ -801,11 +777,15 @@ schema:
       type: Verdict
       required: true
       note: 来自节点 4(Verify 节点)
-      fields: [Kind, SourceID, Confidence, Evidence]
+      fields: [Kind, SourceID, Confidence, Evidence, IndeterminateReason]
     - name: ArtifactHash
       type: string
       required: false
       note: 来自节点 3(Execute 节点),防重
+    - name: PlanRationaleHash
+      type: string
+      required: false
+      note: ≤64B,SHA256[:16] hex,plan_rationale 指纹(H1 修复,2026-07-07),用于 reputation.metadata.rationale_hash 关联 + 诊断反查 DB
   不收字段(契约精简):
     - Plan / PlanLLMOutput(已由 Plan 节点持久化,reputation 不冗余)
     - Observations(已由 Observe 节点持久化,Learn 不消费)
@@ -964,6 +944,11 @@ errors:
   - ErrLearnResponseDBWriteFailed (silent log, 不阻塞主流程)
   - ErrArtifactMetadataHashDuplicate (no_change, 不报错)
 ```
+
+
+## Acceptance Criteria (S5 验收)
+
+> **章节导航**:AC 列表保留在 Affected Files 之前,符合 OpenSpec 规范(验收标准 + 实施细节并列)。所有 AC1-AC68 保持原有逻辑顺序,见章节导航索引表。
 
 ---
 

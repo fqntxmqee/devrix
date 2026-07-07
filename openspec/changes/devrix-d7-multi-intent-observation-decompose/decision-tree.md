@@ -307,7 +307,7 @@ PlanLLMOutput{
 PerChildVerify(n_a):
   - AC-n_a.1 (MentionsAll) → 本地机械执行 → 7 token 全部命中 → Pass
   - AC-n_a.2 (CustomLLMJudge) → D3 LLM 调用 → "清晰" → Pass
-  - Aggregate: 全部 Pass → OverallVerdictKind = Pass
+  - Aggregate: 全部 Pass → VerdictKind = Pass
   - 落 round.Metadata["ac_verdicts"] = JSON([{criterion_id, outcome, evidence}])
 
 PerChildVerify(n_b):
@@ -575,10 +575,10 @@ Step 2: PerCriterionExecutor.Execute:
         - CustomLLMJudge (≤ 3) → 串行调 D3 LLM ~1s
         - 收集 PerCriterionVerdict[] (顺序对齐)
 Step 3: PerCriterionExecutor.Aggregate:
-        - ∃ Required Fail → OverallFail
-        - 全部 Required Pass + ∃ Preferred Fail → OverallPartial
-        - 全部 Pass → OverallPass
-        - 任一 Error 且无 Fail → OverallIndeterminate
+        - ∃ Required Fail → VerdictFail
+        - 全部 Required Pass + ∃ Preferred Fail → VerdictPartial
+        - 全部 Pass → VerdictPass
+        - 任一 Error 且无 Fail → VerdictIndeterminate
         - 落 round.Metadata["ac_verdicts"] = JSON
 ```
 
@@ -597,9 +597,9 @@ Step 3: PerCriterionExecutor.Aggregate:
 
 ## 8.6 Decision Node 5 路径详细表(独立 stage,D7 6 节点流水线)
 
-Verify 节点产出 OverallVerdictKind 后,Decision 节点(独立 stage)立即跑映射表,产出 5 路径决策。**D7 6 节点流水线**(Observe/Plan/Execute/Verify/Decision/Learn,都是独立 stage,Decision 不再合并到 Verify)。
+Verify 节点产出 VerdictKind 后,Decision 节点(独立 stage)立即跑映射表,产出 5 路径决策。**D7 6 节点流水线**(Observe/Plan/Execute/Verify/Decision/Learn,都是独立 stage,Decision 不再合并到 Verify)。
 
-### 8.6.1 决策映射表(9 行,纯规则引擎 0 LLM)
+### 8.6.1 决策映射表(10 行 Verdict-based + 1 plan_error = 11 行总,纯规则引擎 0 LLM)
 
 | Verdict | Other Conditions | Decision | 后续动作 | 持久化 |
 |---------|------------------|----------|----------|--------|
@@ -666,9 +666,9 @@ ItemPipelineRunner.Run() 包含 Verify(节点 4)+ Decision(节点 5)两个独立
   │   └─ Worker n_c → emit partial + PerCriterion 0/1 Fail(LLM judge 1 次没过)
   ├─ Verify (节点 4 独立 stage)
   │   ├─ PerCriterion executor
-  │   │   ├─ n_a: 2/2 Pass → OverallVerdictKind=Pass
-  │   │   ├─ n_b: 2/2 Pass → OverallVerdictKind=Pass
-  │   │   └─ n_c: 0/1 Fail(LLM judge 不通过)→ OverallVerdictKind=Fail
+  │   │   ├─ n_a: 2/2 Pass → VerdictKind=Pass
+  │   │   ├─ n_b: 2/2 Pass → VerdictKind=Pass
+  │   │   └─ n_c: 0/1 Fail(LLM judge 不通过)→ VerdictKind=Fail
   ├─ Decision (节点 5 独立 stage)
   │   ├─ Decision.Decide (verdict=Fail, AttemptNo=0 < MaxRetry=1, IsChildSegment=true, ...)
   │   │   └─ Match 第 5 行 → Decision.Kind = retry
@@ -689,7 +689,7 @@ ItemPipelineRunner.Run() 包含 Verify(节点 4)+ Decision(节点 5)两个独立
 | Decision 类型 | §3.7 | §2.12 | §5.5 | §8.6.1(映射表) |
 | ChildWorkItemSpec | §3.8 | §2.13 | §5.5 | §8.6.4(子 Worker) |
 | DecisionNodeIO | §13 | §2.12 | §5.5(3 步决策) | §8.6.5(完整 trace) |
-| 5 路径枚举 | §3.7 values | §2.12 DecisionKind | §5.5 5 路径表 | §8.6.1(9 行映射) |
+| 5 路径枚举 | §3.7 values | §2.12 DecisionKind | §5.5 5 路径表 | §8.6.1(11 行映射 = 10 baseline + 1 plan_error) |
 | 边界 case | — | §2.12 错误处理 | — | §8.6.3(8 行降级) |
 | AC29-AC34 | 验收标准 | — | — | §8.6.1 + §8.6.3 全覆盖 |
 | tasks T46-T52 | — | §2.12 + §2.13 | — | — |
@@ -713,7 +713,7 @@ User
   ↓
 4. Verify   (PerCriterion, < 50ms)
   ↓
-5. Decision (9 行静态映射, < 5ms, 0 LLM)
+5. Decision (11 行静态映射, < 5ms, 0 LLM)
   ↓    └─ A accept → 走到 Learn
   ↓    └─ B retry  → 回到节点 1-4 循环
   ↓    └─ C child_worker → 子 1-4 循环
@@ -738,14 +738,18 @@ User
 
 ```yaml
 LearnRequest:                                # 6 节点契约精简版
-  WorkItemID:    string                      # per-segment attribution
-  Decision:      Decision                    # 来自节点 5
-  Verdict:       Verdict{Kind, SourceID, Confidence, Evidence}  # 来自节点 4
-  ArtifactHash:  string                      # 来自节点 3(可选,防重)
+  WorkItemID:        string                  # per-segment attribution
+  Decision:          Decision                # 来自节点 5
+  Verdict:           Verdict{Kind, SourceID, Confidence, Evidence, IndeterminateReason}  # 来自节点 4
+  ArtifactHash:      string                  # 来自节点 3(可选,防重)
+  PlanRationaleHash: string                  # ≤64B,SHA256[:16] hex,plan_rationale 指纹(H1 修复)
   # 不收字段(契约精简):
   #   - Plan / PlanLLMOutput(Plan 节点自己持久化,reputation 不冗余)
   #   - Observations(Observe 节点自己持久化,Learn 不消费)
   #   - ParentContext(Learn 内部按 Decision.parent_rollup 从 DB 查 child rows)
+  #   - plan_rationale 全量(可能 1-2KB,改存 16B 指纹,反查 DB 即可)
+  # IndeterminateReason 关键性:区分 verifier_parse_failure vs env_limited(驱动 PendingAsset routing + β++),
+  #                          G8-1 修复扩展,2026-07-07 锁定为 LearnRequest 必带字段。
 
 LearnResponse:
   UpdatedAlpha:    float64
@@ -788,8 +792,9 @@ ReputationRow:
   last_updated:         time.Time
   decision_kind_history:[]string      # 最近 5 次 DecisionKind(滚动)
   source_id_history:    []string      # 最近 5 次 Verdict.SourceID
-  plan_rationale:       string
   artifact_metadata_hash:string       # 防重
+  metadata:             JSON          # 含 rationale,user_action,force_plan 等(2026-07-07 新增)
+  deprecated_plan_rationale:string   # DEPRECATED 2026-07-07 冻结,迁移到 metadata.rationale,保留列只为兼容旧 row
 ```
 
 ### 8.7.5 5 场景的 Learn 节点行为分布
@@ -851,11 +856,11 @@ ItemPipelineRunner.Run() 完整链路:
 
 ```
 ↑ 上游:Verify(节点 4)+ Decision(节点 5)两个独立 stage
-   - 输入:PerCriterionVerdict[] + OverallVerdictKind + Decision{Kind, Reason}
+   - 输入:PerCriterionVerdict[] + VerdictKind + Decision{Kind, Reason}
    - 产出:LearnRequest(自动构造)
 
 ↓ 下游:Reputation DB(SQLite)
-   - 表:reputation(id, segment_id, parent_id, alpha, beta, last_updated, decision_kind_history, source_id_history, plan_rationale, artifact_metadata_hash)
+   - 表:reputation(id, segment_id, parent_id, alpha, beta, last_updated, decision_kind_history, source_id_history, artifact_metadata_hash, metadata, deprecated_plan_rationale) = 11 字段(2026-07-07 锁定)
    - 操作:SELECT / INSERT / UPDATE(同一 segment_id 多次 UPDATE 累加)
    - cold start:0 行 → BuildAdaptivePrior Beta(5, 3)
 
@@ -919,7 +924,7 @@ ItemPipelineRunner.Run() 完整链路:
 | 10 | E上游 | **E4-post** ctx cancel 晚 | ctx.Done() after Verify emit | accept(last good) | Pass(last good) | enqueue 1 次,SourceID=`verify:seg_a_id_last_good` | alpha_bump |
 | 11 | E上游 | **E5** LLM judge 超时 | `LLMJudgeTimeout > 15s` | human_review | SystemAnomaly | enqueue 1 次,VerdictKind=SystemAnomaly → β++ | beta_bump |
 | 12 | E上游 | **E6** Decision map miss | map miss → default fallback | human_review | SystemAnomaly | enqueue 1 次,β++ | beta_bump |
-| 13 | U用户 | **U1** user-cancel | feishu.abort()(用户点飞书取消) | (no Decision) | (no Verdict) | enqueue 1 次,SourceID=`user_cancel:seg_a_id` → β++ | beta_bump |
+| 13 | U用户 | **U1** user-cancel | feishu.abort()(用户点飞书取消) | (no Decision) | (no Verdict) | 24h 内同 segment_id 累计 ≥ 3 次 → audit_hold(只 audit 不 β++);否则 enqueue 1 次,SourceID=`user_cancel:seg_a_id` → β++ | beta_bump |
 | 14 | U用户 | **U2** user-accept | feishu.accept()(用户点飞书确认) | accept | Pass | enqueue 1 次,SourceID=`user_accept:seg_a_id` → α++(fast-track) | alpha_bump |
 | 15 | U用户 | **U3** user-modify | feishu.modify()(用户编辑后续发) | (新 directive) | (新) | **本轮不 Learn**,下轮 directive 重新走完整 6 节点 | no_change |
 | 16 | Fforce | **F1** force_plan 触发 | `β/(α+β) > 0.7` (reputation 触发降级) | accept(last) | Pass(last) | enqueue 1 次 + 写 `metadata.next_observation_force_plan=true` | force_plan |
@@ -990,7 +995,7 @@ ItemPipelineRunner.Run() 完整链路:
 | # | 维度 | Plan 输出 | Execute 行为 (节点 3) | Decision 行为 (节点 5) | Learn 行为 (节点 6) |
 |---|------|----------|---------------------|---------------------|---------------------|
 | 1 | 基础 | **P-S-A** 单确定性 fast-path | NO Execute (ItemPipelineRunner 跳过) | NO Decision | Learn α++ (SourceID=`obs_fact:seg_a_id`) |
-| 2 | 基础 | **P-S-B** 单不确定性 | 单 Worker 串行 Execute | A accept (default 9 行映射) | Learn α++ (SourceID=`verify:seg_a_id`) |
+| 2 | 基础 | **P-S-B** 单不确定性 | 单 Worker 串行 Execute | A accept (default 11 行映射) | Learn α++ (SourceID=`verify:seg_a_id`) |
 | 3 | 基础 | **P-S-C** 多确定性 fast-path | NO Execute | NO Decision | Learn α++ × N (per-segment) |
 | 4 | 基础 | **P-S-D** 多不确定性 | RunPlanDAG 并行 4 worker | A accept × N + D parent_rollup | Learn α_bump × N + parent sum |
 | 5 | 基础 | **P-S-E** 混合 (fast-path + verified) | fast-path 部分跳过,verified 部分 RunPlanDAG | fast-path 部分跳过,parent rollup 统一 A accept (决策 4) | Learn × 2 (seg_a fast-path + seg_b verified) + parent sum |
@@ -1030,7 +1035,7 @@ ItemPipelineRunner.Run() 完整链路:
 
 **关键覆盖说明**:
 
-1. **Plan LLM 错误新增 Decision 路径**(P1-P3):Decision 9 行映射表扩展为 **10 行**,新增第 10 行 `plan_error` → E human_review,与现有 9 行 Verdict-based 决策正交(Plan 错误时无 Verdict,直接走 plan_error 路径)
+1. **Plan LLM 错误新增 Decision 路径**(P1-P3):Decision 10 行 Verdict-based 映射表扩展为 **11 行**,新增第 11 行 `plan_error` → E human_review,与现有 10 行 Verdict-based 决策正交(Plan 错误时无 Verdict,直接走 plan_error 路径)
 2. **Parse Reject 重试 ≤ 2 次 + 降级旧 Plan**(P4-P17):重试上限 2 次同 §9 feedback_loop 3 子类(避免 LLM 循环);降级到旧 SpawnPolicy.DecomposeIntoChildren 是 v1 兼容路径,无 AC 时 Verify 用 fallback NumericRange
 3. **rationale 缺失可选**(P9):rationale 是 Learn metadata 字段,Execute/Decision 行为不变,Learn metadata 缺字段 + audit log 警告(不影响 α/β 累计)
 4. **fast-path 命中 Plan 跳过**(P18-P19):Plan 节点直接 short-circuit 到 ItemPipelineRunner.Run,跳过 Execute / Decision 节点
@@ -1042,7 +1047,7 @@ ItemPipelineRunner.Run() 完整链路:
 - Learn 节点 22 场景是下游输出
 - 两者交集:基础 5 场景 + Parse Reject 降级后 + force_plan 路径 = 13 场景触发 Learn,与 §8.7.10 统计一致
 
-**验收映射**:本表 26 行 = spec_delta.md §3.13 AC55-AC66 的 12 条新 AC(每条 AC 覆盖 1-3 个场景)+ §3.14 1 条 AC 覆盖 Decision 10 行映射表扩展。
+**验收映射**:本表 26 行 = spec_delta.md §3.13 AC55-AC66 的 12 条新 AC(每条 AC 覆盖 1-3 个场景)+ §3.14 1 条 AC 覆盖 Decision 11 行映射表扩展(10 baseline + 1 plan_error)。
 
 ---
 
