@@ -527,6 +527,7 @@ func (s *WaveScheduler) dispatchOne(parentCtx context.Context, sessionID string,
 			Error:      errMsg,
 			StartedAt:  handle.startedAt,
 			EndedAt:    time.Now(),
+			Metadata:   node.Metadata,
 		}
 		s.completeTask(sessionID, state, node.ID, slotID, art)
 	}()
@@ -677,6 +678,38 @@ func (s *WaveScheduler) CancelAll(sessionID string) int {
 		return 0
 	}
 	return s.cancelWaveLocked(state)
+}
+
+// AbortSession is the full-abort path used by DAGExecutor (PR-B, cursor Q4
+// HIGH). It:
+//
+//  1. Cancels the wave-level context (state.cancel) so dispatchLoop exits.
+//  2. Cancels every running worker handle (cancelWaveLocked).
+//  3. Marks every still-pending node StateCancelled so AllTerminal() can
+//     transition true without waiting for the dispatchLoop's next tick.
+//
+// Returns (runningCancelled, pendingCancelled). Idempotent. The wave is
+// left in the scheduler's `s.waves` map; the next WaitForCompletion will
+// return immediately because doneCh is already closed by markWaveDone
+// (called from dispatchLoop once ctx fires).
+func (s *WaveScheduler) AbortSession(sessionID string) (runningCancelled, pendingCancelled int) {
+	if s == nil {
+		return 0, 0
+	}
+	s.mu.Lock()
+	state, ok := s.waves[sessionID]
+	s.mu.Unlock()
+	if !ok {
+		return 0, 0
+	}
+	state.mu.Lock()
+	if state.cancel != nil {
+		state.cancel()
+	}
+	state.mu.Unlock()
+	runningCancelled = s.cancelWaveLocked(state)
+	pendingCancelled = state.graph.CancelPending()
+	return runningCancelled, pendingCancelled
 }
 
 func (s *WaveScheduler) cancelWaveLocked(state *schedulerWaveState) int {

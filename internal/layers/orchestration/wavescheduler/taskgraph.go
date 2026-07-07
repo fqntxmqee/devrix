@@ -9,10 +9,24 @@ import (
 // per-node state for dispatch decisions (ReadyNodes) and terminal checks
 // (AllTerminal). Mutating methods are safe for concurrent use by the
 // scheduler loop and worker goroutines.
+//
+// PR-B (DM-20260707-001) added SortReadyNodes — a deterministic-ordering
+// hook consumed by DAGExecutor. nil hook preserves the original lex-by-ID
+// order; non-nil hook runs under the RLock immediately before the inline
+// sort.Slice. The hook must be safe to call concurrently with other
+// read-side operations; it MUST NOT call any write method (SetState,
+// Mutate) on this TaskGraph or its successor because that would deadlock
+// (sync.RWMutex prohibits write-lock acquisition from the same goroutine
+// holding the read lock).
 type TaskGraph struct {
 	mu     sync.RWMutex
 	nodes  map[string]TaskNode
 	states map[string]TaskState
+
+	// SortReadyNodes is the optional priority hook. See type doc above.
+	// nil = lex-by-ID order (pre-PR-B behaviour). Set by DAGExecutor at
+	// TaskGraph construction time.
+	SortReadyNodes func(nodes []TaskNode)
 }
 
 // NewTaskGraph builds a graph from a list of nodes. Duplicate ids cause an
@@ -89,7 +103,16 @@ func (g *TaskGraph) ReadyNodes() []TaskNode {
 			out = append(out, n)
 		}
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	// Apply the priority hook first; the hook is authoritative for ordering
+	// (it includes its own lex tie-break via sort.SliceStable). When the hook
+	// is nil (pre-PR-B behaviour), fall back to a pure lex sort. This runs
+	// under the RLock; the hook MUST NOT call any write method on this
+	// TaskGraph (see type doc on SortReadyNodes).
+	if g.SortReadyNodes != nil {
+		g.SortReadyNodes(out)
+	} else {
+		sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	}
 	return out
 }
 
@@ -134,6 +157,25 @@ func (g *TaskGraph) NodeCount() int {
 	return len(g.nodes)
 }
 
+// NodeIDs returns a snapshot of every node id in the graph. Used by the
+// DAGExecutor abort path (cursor Q4 HIGH) to emit cancel events for
+// nodes that are still in StateRunning / StatePending when the abort
+// fires — the per-worker goroutine transitions to StateCancelled only
+// after Run() returns, so without this snapshot the polling goroutine
+// would close the channel before those workers land in StateCancelled.
+func (g *TaskGraph) NodeIDs() []string {
+	if g == nil {
+		return nil
+	}
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	out := make([]string, 0, len(g.nodes))
+	for id := range g.nodes {
+		out = append(out, id)
+	}
+	return out
+}
+
 // TerminalArtifacts returns a snapshot of (id, terminal state) for finished
 // nodes. Used by WaitForCompletion to summarize the wave.
 func (g *TaskGraph) TerminalArtifacts() map[string]TaskState {
@@ -158,4 +200,28 @@ func depsSatisfied(deps []string, completed map[string]struct{}) bool {
 		}
 	}
 	return true
+}
+
+// CancelPending marks every StatePending node as StateCancelled and
+// returns the number of nodes that transitioned. Already-terminal nodes
+// are left untouched. Idempotent. Added in PR-B for DAGExecutor abort
+// path (cursor Q4 HIGH risk: pending nodes survive CancelAll, so without
+// an explicit pending → cancelled sweep the dispatchLoop would never see
+// AllTerminal() == true after a partial-failure abort).
+//
+// Caller MUST NOT hold g.mu — this acquires the write lock internally.
+func (g *TaskGraph) CancelPending() int {
+	if g == nil {
+		return 0
+	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	count := 0
+	for id, st := range g.states {
+		if st == StatePending {
+			g.states[id] = StateCancelled
+			count++
+		}
+	}
+	return count
 }
