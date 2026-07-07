@@ -5,35 +5,61 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/devrix/devrix/internal/layers/orchestration/interfaces"
+	ifaces "github.com/devrix/devrix/internal/layers/orchestration/interfaces"
 	sharederrors "github.com/devrix/devrix/internal/shared/errors"
 )
 
-// Plan is the structured output of the Plan node (MUPS v4.3 Phase 2 PR-B1).
+// Plan is the structured output of the Plan node (MUPS v4.3 Phase 2 PR-B1),
+// extended for multi-intent decomposition (DM-20260707-001 PR-A1 T03).
 //
 // One Plan per user message; consumed by Phase 3 Execute node which routes
 // to one of 4 channels based on Plan.Kind.
 //
 // Constructed via DefaultPlanner.Plan() or via direct literal in tests —
 // Validate() enforces PP-1/2/3 before the Plan can be dispatched.
+//
+// Multi-intent extension (PR-A1, DM-20260707-001 方案 β):
+//   - IntentSegmentSet *ifaces.IntentSegmentSet      → multi-segment directive
+//   - DAG             *PlanDAG                       → segment-level parallel execution
+//
+// These two optional fields carry the multi-intent semantics; both nil
+// preserves backward compatibility with the Phase 2 PR-B1 4-channel path.
+//
+// Boundary note: Plan.Validate() does NOT descend into IntentSegmentSet / DAG
+// semantics. The DAG validator at plan/dag_validator.go owns PlanDAG checks;
+// IntentSegment.Validate() owns its own grammar. Validate here is strictly
+// the PP-1/2/3 + structural checks inherited from Phase 2 PR-B1.
 type Plan struct {
-	ID                    string             `json:"id"`
-	SessionID             string             `json:"session_id,omitempty"`
-	Kind                  PlanKind           `json:"kind"`
-	Strength              float64            `json:"strength"`
-	Steps                 []Step             `json:"steps"`
+	ID                   string             `json:"id"`
+	SessionID            string             `json:"session_id,omitempty"`
+	Kind                 PlanKind           `json:"kind"`
+	Strength             float64            `json:"strength"`
+	Steps                []Step             `json:"steps"`
 	FailureCriteria      []FailureCriterion `json:"failure_criteria"`
-	BlastRadius           BlastRadius        `json:"blast_radius"`
-	SourceObservationIDs  []string           `json:"source_observation_ids"`
-	AnomaliesCount        int                `json:"anomalies_count,omitempty"`
+	BlastRadius          BlastRadius        `json:"blast_radius"`
+	SourceObservationIDs []string           `json:"source_observation_ids"`
+	AnomaliesCount       int                `json:"anomalies_count,omitempty"`
 	// ResolutionStrategies (DM-20260704-006) — the per-ObsID resolution
 	// contract that closes break-chain A (Obs→Resolution). Optional; when
 	// non-empty, the LLM Verifier cross-checks ResolutionClaim[] from
 	// Execute against these strategies to compute CoverageRatio. Any
 	// strategy whose SubWorktree is non-nil triggers SpawnDecompose via
 	// RC-4a (break-chain B closure).
-	ResolutionStrategies []interfaces.ResolutionStrategy `json:"resolution_strategies,omitempty"`
-	CreatedAt             time.Time          `json:"created_at"`
+	ResolutionStrategies []ifaces.ResolutionStrategy `json:"resolution_strategies,omitempty"`
+
+	// IntentSegmentSet (DM-20260707-001 PR-A1 T03) — produced by Observe when
+	// the directive yields ≥2 segments. Triggers the multi-intent path. The
+	// Plan is then consumed by the DAG executor (PR-B) which routes each
+	// segment to RunPlanDAG. SpawnPolicy remains the existing 3-value enum
+	// (workmodel/pipeline_round.go:27-34) — this field carries its semantics.
+	IntentSegmentSet *ifaces.IntentSegmentSet `json:"intent_segment_set,omitempty"`
+
+	// DAG (DM-20260707-001 PR-A1 T03) — the per-segment execution graph. nil
+	// when Plan falls back to the 4-channel Phase 2 PR-B1 path. Validity is
+	// enforced by plan/dag_validator.go; Plan.Validate() does not check it.
+	DAG *PlanDAG `json:"dag,omitempty"`
+
+	CreatedAt time.Time `json:"created_at"`
 	// FailureCriteriaOpWhitelist and ObservableFailureCriterionFields are
 	// package-level; Validate() reads them.
 }
@@ -81,8 +107,53 @@ func (p Plan) WithAnomaliesCount(n int) Plan {
 // WithResolutionStrategies returns a copy with the new ResolutionStrategies
 // slice (DM-20260704-006). The slice is copied so callers can mutate the
 // input without affecting the receiver (immutable value-object pattern).
-func (p Plan) WithResolutionStrategies(strategies []interfaces.ResolutionStrategy) Plan {
-	p.ResolutionStrategies = append([]interfaces.ResolutionStrategy(nil), strategies...)
+func (p Plan) WithResolutionStrategies(strategies []ifaces.ResolutionStrategy) Plan {
+	p.ResolutionStrategies = append([]ifaces.ResolutionStrategy(nil), strategies...)
+	return p
+}
+
+// WithIntentSegmentSet returns a copy with the IntentSegmentSet set
+// (DM-20260707-001 PR-A1 T03). Triggers the multi-intent path on the next
+// Execute round; SpawnPolicy itself is untouched.
+//
+// Pass nil to clear the field (immutable builder semantics). The caller
+// retains ownership of the underlying *ifaces.IntentSegmentSet.
+func (p Plan) WithIntentSegmentSet(s *ifaces.IntentSegmentSet) Plan {
+	if s == nil {
+		p.IntentSegmentSet = nil
+	} else {
+		copy := *s
+		p.IntentSegmentSet = &copy
+	}
+	return p
+}
+
+// WithDAG returns a copy with the DAG set (DM-20260707-001 PR-A1 T03).
+// Triggers the multi-intent path on the next Execute round alongside
+// IntentSegmentSet — both fields must be non-nil for the DAG executor to
+// fire; the asymmetry is caught by PR-B at run time, not here.
+//
+// Deep-copies the slice/map fields (Nodes, Edges, Priorities) so callers
+// can mutate the input PlanDAG without affecting the receiver (immutable
+// value-object pattern). Pass nil to clear.
+//
+// Validity of the DAG is owned by plan/dag_validator.go; this builder just
+// stores the pointer.
+func (p Plan) WithDAG(d *PlanDAG) Plan {
+	if d == nil {
+		p.DAG = nil
+		return p
+	}
+	cp := PlanDAG{
+		Nodes:          append([]PlanNode(nil), d.Nodes...),
+		Edges:          append([]DataEdge(nil), d.Edges...),
+		Priorities:     make(map[string]int, len(d.Priorities)),
+		MaxParallelism: d.MaxParallelism,
+	}
+	for k, v := range d.Priorities {
+		cp.Priorities[k] = v
+	}
+	p.DAG = &cp
 	return p
 }
 
@@ -168,6 +239,15 @@ func (p *Plan) ValidateWithOpts(opts ValidateOpts) error {
 	}
 	if p.BlastRadius.TokenCost > opts.tokenLimit() {
 		return NewPlanBlastRadiusExceededError("TokenCost", p.BlastRadius.TokenCost, opts.tokenLimit())
+	}
+
+	// 4. DAG (DM-20260707-001 PR-A1 T13) — when present, validate grammar
+	// (no cycles, ≤10 nodes, ≤8 fan-out, no duplicates, no dangling edges).
+	// nil DAG is the PR-B1 4-channel path and is valid as-is.
+	if p.DAG != nil {
+		if err := validateDAG(p.DAG, opts.dagOpts()); err != nil {
+			return err
+		}
 	}
 
 	return nil
