@@ -247,6 +247,37 @@ func TestLLMIntentSegmenter_NilInvoker(t *testing.T) {
 	}
 }
 
+// TestLLMIntentSegmenter_RoutesUserContextPrepend (DM-20260706-008) verifies
+// that LLMIntentSegmenter.Segment routes its outgoing messages through
+// messagesForLLMInvoke so the AGENTS.md prepend (D{N} → path mapping)
+// reaches the LLM exactly like the Observe/Plan proposers do. Without
+// this wiring, IntentSegmenter is invisible to the D2→D3 prepend contract
+// enforced by scripts/check-d7-d3-prepend-boundary.sh.
+func TestLLMIntentSegmenter_RoutesUserContextPrepend(t *testing.T) {
+	stub := &stubSegLLM{raw: `[{"id":"seg_0","text":"x","kind":"explore","priority":50,"confidence":0.8}]`}
+	s := NewLLMIntentSegmenter(stub)
+	prepend := map[string]string{"AGENTS.md": "D7 = internal/layers/orchestration/"}
+	_, err := s.Segment(context.Background(), SegmentRequest{
+		SessionID:          "sess_prepend",
+		Message:            "查 devrix",
+		UserContextPrepend: prepend,
+	})
+	if err != nil {
+		t.Fatalf("Segment: %v", err)
+	}
+	if len(stub.messageLast) < 2 {
+		t.Fatalf("messagesForLLMInvoke should prepend >=1 entry, got %d", len(stub.messageLast))
+	}
+	if !strings.Contains(stub.messageLast[0].Content, "AGENTS.md") ||
+		!strings.Contains(stub.messageLast[0].Content, "D7 = internal/layers/orchestration/") {
+		t.Errorf("prepended message must contain AGENTS.md + D7 mapping, got %q", stub.messageLast[0].Content)
+	}
+	// User message must follow the prepend, verbatim.
+	if len(stub.messageLast) < 2 || !strings.Contains(stub.messageLast[1].Content, "查 devrix") {
+		t.Errorf("user message lost after prepend, got %+v", stub.messageLast)
+	}
+}
+
 // =====================================================================
 // parseLLMSegmenterJSON unit tests (white-box: skip dispatcher; pin
 // parse edge cases including markdown fencing + empty + boundary clamp).

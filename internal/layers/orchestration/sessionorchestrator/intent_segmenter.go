@@ -62,6 +62,13 @@ type SegmentRequest struct {
 	SessionID string
 	Message   string
 	Prior     *learn.AdaptivePrior
+	// UserContextPrepend (DM-20260706-008) is the runtime user-context
+	// prepend (AGENTS.md / D{N}→path mapping) that the D2 contextengine
+	// surfaces for the active session. The LLMIntentSegmenter routes its
+	// messages through messagesForLLMInvoke with this map so the AGENTS.md
+	// prepend reaches the LLM exactly like Observe/Plan proposers do.
+	// Default nil = no prepend (legacy callers unaffected).
+	UserContextPrepend map[string]string
 }
 
 // IntentSegmenter produces an IntentSegmentSet from a raw user message.
@@ -285,11 +292,11 @@ func (s *LLMIntentSegmenter) Segment(ctx context.Context, req SegmentRequest) (i
 	}
 	systemPrompt := llmSegmenterSystemPrompt
 	userPrompt := buildLLMSegmenterUserPrompt(req)
-	msgs := []types.Message{{
+	msgs := messagesForLLMInvoke([]types.Message{{
 		SessionID: req.SessionID,
 		Role:      types.MessageRoleUser,
 		Content:   userPrompt,
-	}}
+	}}, req.UserContextPrepend)
 	ch, err := s.LLM.InvokeStream(ctx, orchtypes.LLMInvokeRequest{
 		SessionID:    req.SessionID,
 		SystemPrompt: systemPrompt,
