@@ -37,6 +37,22 @@ type CoordinatorConfig struct {
 	// bootstrap layer merges this into ItemPipelineRunner.SemanticConfig
 	// and constructs a DefaultSemanticVerifier.
 	SemanticConvergence SemanticConvergenceFileConfig `yaml:"semantic_convergence"`
+	// DAGExecutor (DM-20260707-001 PR-D, D7) gates the multi-intent DAG
+	// fork at ItemPipelineRunner.Run(). When Enabled is true, a Plan
+	// emitting pl.DAG + pl.IntentSegmentSet forks into the DAG executor
+	// path; when false (default), the legacy single-WorkItem path runs
+	// unchanged. Mirrors orchtypes.DAGExecutorConfig — staged rollout
+	// starts with the flag OFF until ops confirms DAG canary metrics.
+	DAGExecutor DAGExecutorFileConfig `yaml:"dag_executor"`
+}
+
+// DAGExecutorFileConfig mirrors orchtypes.DAGExecutorConfig for YAML
+// deserialization. Pointer fields let BuildCoordinatorConfig distinguish
+// "absent in yaml" (keep default) from "explicitly false / 0".
+type DAGExecutorFileConfig struct {
+	Enabled               *bool `yaml:"enabled"`
+	MaxFanOut             *int  `yaml:"max_fan_out"`
+	MaxRetryOnPartialFail *int  `yaml:"max_retry_on_partial_fail"`
 }
 
 // SemanticConvergenceFileConfig mirrors orchtypes.SemanticConvergenceConfig
@@ -72,6 +88,14 @@ func DefaultCoordinatorConfig() CoordinatorConfig {
 			LookbackN:     coordIntPtr(5),
 			TimeoutMs:     coordIntPtr(8000),
 			ModelTier:     coordStringPtr(""),
+		},
+		// DAGExecutor production default = Enabled=false (DM-20260707-001
+		// PR-D). Multi-intent DAG fork stays dormant until ops flips
+		// dag_executor.enabled=true in devrix.yaml.
+		DAGExecutor: DAGExecutorFileConfig{
+			Enabled:               boolPtr(false),
+			MaxFanOut:             coordIntPtr(8),
+			MaxRetryOnPartialFail: coordIntPtr(1),
 		},
 	}
 }
@@ -129,6 +153,17 @@ func BuildCoordinatorConfig(file *CoordinatorFileConfig) CoordinatorConfig {
 		}
 		if file.SemanticConvergence.ModelTier != nil {
 			cfg.SemanticConvergence.ModelTier = file.SemanticConvergence.ModelTier
+		}
+	}
+	if file.DAGExecutor != nil {
+		if file.DAGExecutor.Enabled != nil {
+			cfg.DAGExecutor.Enabled = file.DAGExecutor.Enabled
+		}
+		if file.DAGExecutor.MaxFanOut != nil {
+			cfg.DAGExecutor.MaxFanOut = file.DAGExecutor.MaxFanOut
+		}
+		if file.DAGExecutor.MaxRetryOnPartialFail != nil {
+			cfg.DAGExecutor.MaxRetryOnPartialFail = file.DAGExecutor.MaxRetryOnPartialFail
 		}
 	}
 	return cfg

@@ -44,6 +44,13 @@ type ItemPipelineWireDeps struct {
 	// / EmitFinalCard methods). nil → DAG path still runs inner Execute +
 	// Learn, but skips the IM streaming card emit.
 	StreamingEmitter sessionorchestrator.StreamingEmitter
+	// DAGEnabled (DM-20260707-001 PR-D, T29) is the runtime gate
+	// mirroring devrix.d7.dag_executor.enabled. When false (zero value,
+	// production default), ItemPipelineRunner.Run() suppresses the
+	// DAG fork at item_pipeline.go and runs the legacy single-WorkItem
+	// path even when pl.DAG is set — staging rollout per proposal.md §6.
+	// true flips the fork on.
+	DAGEnabled bool
 }
 
 // WireDefaultMUPSLearner constructs the in-process LP-1 learner used by both
@@ -128,6 +135,7 @@ func WireItemPipeline(deps ItemPipelineWireDeps) (*sessionorchestrator.ItemPipel
 		// wiring those into WireItemPipeline's caller.
 		DAGExecutor:      deps.DAGExecutor,
 		StreamingEmitter: deps.StreamingEmitter,
+		DAGEnabled:       deps.DAGEnabled,
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("wire item pipeline: %w", err)

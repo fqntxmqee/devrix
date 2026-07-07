@@ -28,6 +28,53 @@ func DefaultSemanticConvergenceConfig() SemanticConvergenceConfig {
 	}
 }
 
+// DAGExecutorConfig is the runtime view of the `dag_executor` YAML
+// sub-config under the d7 block (DM-20260707-001 PR-D, T29). The YAML
+// key is `dag_executor` (see DAGExecutorFileConfig below). When
+// `Enabled` is true, ItemPipelineRunner forks into the multi-intent DAG
+// execution path (executePlanDAG) whenever a Plan emits pl.DAG +
+// pl.IntentSegmentSet. When false (default), the fork gate at
+// item_pipeline.go:414 short-circuits and the legacy single-WorkItem
+// path runs unchanged — keeping the flag a zero-impact gate for staged
+// rollout (DM-20260707-001 §3 Backward Compatibility).
+//
+// Why a separate config rather than reusing Enabled:
+//   - the legacy D7 enabled flag gates the entire D7 layer (D1 routing);
+//     this flag gates a *sub-feature inside* D7 (multi-intent DAG).
+//   - keeping them independent lets ops flip DAG off without disabling
+//     the rest of D7 (e.g. semantic convergence, observation fast-path).
+//
+// Devrix.yaml example:
+//   d7:
+//     enabled: true
+//     dag_executor:
+//       enabled: true           # default false
+//       max_fan_out: 8          # default 8
+//       max_retry_on_partial_fail: 1   # default 1
+type DAGExecutorConfig struct {
+	Enabled bool
+	// MaxFanOut caps the validated PlanDAG node count. Default 8 matches
+	// DAGValidator's MaxFanOut sentinel; the WaveScheduler hard 4-worker
+	// cap is unchanged.
+	MaxFanOut int
+	// MaxRetryOnPartialFail caps the auto-retry loop on VerdictPartial.
+	// Matches design.md §2.12 MaxRetry=1 (i.e. only one retry before the
+	// next segment), but exposed here so prod can dial it down for
+	// latency-sensitive workloads.
+	MaxRetryOnPartialFail int
+}
+
+// DefaultDAGExecutorConfig returns the production default (flag OFF).
+// Mirrors proposal.md §6: "first 5% → 100% across 2 weeks" — until ops
+// flips the flag, the multi-intent path is dormant.
+func DefaultDAGExecutorConfig() DAGExecutorConfig {
+	return DAGExecutorConfig{
+		Enabled:               false,
+		MaxFanOut:             8,
+		MaxRetryOnPartialFail: 1,
+	}
+}
+
 // Config is the runtime configuration for the D7 orchestration domain (v2.6.0).
 //
 // Active fields:
@@ -42,6 +89,10 @@ func DefaultSemanticConvergenceConfig() SemanticConvergenceConfig {
 //     for semantics. 0 (default) disables TurnState + transcript injection.
 //   - SemanticConvergence (D7-S16, DM-20260706-006): LLM-driven semantic verify
 //     for the MUPS Verify node. See SemanticConvergenceConfig docs.
+//   - DAGExecutor (DM-20260707-001 PR-D, T29): multi-intent DAG routing.
+//     When Enabled is true, ItemPipelineRunner forks into the DAG path
+//     when Plan emits pl.DAG + pl.IntentSegmentSet. Default false; see
+//     DAGExecutorConfig docs.
 //
 // Retired fields (DM-20260629-001): FastPathThreshold / LLMFallback / ShadowLLMClassify /
 // ShadowLLMTimeoutMs + RuleOrchestrateConfig() removed in v2.6.0; FastPath retired in
@@ -54,6 +105,7 @@ type Config struct {
 	CommandWhitelist            []string
 	PriorContextRounds          int
 	SemanticConvergence         SemanticConvergenceConfig
+	DAGExecutor                 DAGExecutorConfig
 }
 
 // DefaultConfig returns the v2.6.0 default. This is what D1 routes against
@@ -68,19 +120,31 @@ func DefaultConfig() *Config {
 			"/plan", "/stop", "/task", "/help",
 		},
 		SemanticConvergence: DefaultSemanticConvergenceConfig(),
+		DAGExecutor:         DefaultDAGExecutorConfig(),
 	}
 }
 
 // FileConfig is the YAML deserialization target. BuildConfig merges file
 // overrides on top of DefaultConfig (per coding.md §4.2).
 type FileConfig struct {
-	Enabled                     *bool                       `yaml:"enabled"`
-	RoutingMode                 *string                     `yaml:"routing_mode"`
-	CommandFirst                *bool                       `yaml:"command_first"`
-	AdvisoryValidationTimeoutMs *int                        `yaml:"d6_validation_timeout_ms"`
-	CommandWhitelist            []string                    `yaml:"command_whitelist"`
-	PriorContextRounds          *int                        `yaml:"prior_context_rounds"`
+	Enabled                     *bool                          `yaml:"enabled"`
+	RoutingMode                 *string                        `yaml:"routing_mode"`
+	CommandFirst                *bool                          `yaml:"command_first"`
+	AdvisoryValidationTimeoutMs *int                           `yaml:"d6_validation_timeout_ms"`
+	CommandWhitelist            []string                       `yaml:"command_whitelist"`
+	PriorContextRounds          *int                           `yaml:"prior_context_rounds"`
 	SemanticConvergence         *SemanticConvergenceFileConfig `yaml:"semantic_convergence"`
+	DAGExecutor                 *DAGExecutorFileConfig         `yaml:"dag_executor"`
+}
+
+// DAGExecutorFileConfig mirrors DAGExecutorConfig with pointer fields so
+// BuildConfig can distinguish "absent in yaml" (keep default) from
+// "explicitly false / 0". D7 PR-D concern: YAML underscore is the wire
+// format, so devrix.yaml uses `dag_executor.enabled`, not `dagExecutor`.
+type DAGExecutorFileConfig struct {
+	Enabled               *bool `yaml:"enabled"`
+	MaxFanOut             *int  `yaml:"max_fan_out"`
+	MaxRetryOnPartialFail *int  `yaml:"max_retry_on_partial_fail"`
 }
 
 // SemanticConvergenceFileConfig mirrors SemanticConvergenceConfig with
@@ -120,6 +184,28 @@ func BuildConfig(file *FileConfig) *Config {
 	}
 	if file.SemanticConvergence != nil {
 		cfg.SemanticConvergence = BuildSemanticConvergenceConfig(file.SemanticConvergence)
+	}
+	if file.DAGExecutor != nil {
+		cfg.DAGExecutor = BuildDAGExecutorConfig(file.DAGExecutor)
+	}
+	return cfg
+}
+
+// BuildDAGExecutorConfig merges file over default. nil fields preserve
+// the default; an explicitly-set Enabled=false is honored (rollout OFF).
+func BuildDAGExecutorConfig(file *DAGExecutorFileConfig) DAGExecutorConfig {
+	cfg := DefaultDAGExecutorConfig()
+	if file == nil {
+		return cfg
+	}
+	if file.Enabled != nil {
+		cfg.Enabled = *file.Enabled
+	}
+	if file.MaxFanOut != nil {
+		cfg.MaxFanOut = *file.MaxFanOut
+	}
+	if file.MaxRetryOnPartialFail != nil {
+		cfg.MaxRetryOnPartialFail = *file.MaxRetryOnPartialFail
 	}
 	return cfg
 }

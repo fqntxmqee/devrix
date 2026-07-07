@@ -19,6 +19,13 @@ const (
 	RoundPhaseExecute    RoundPhase = "execute"
 	RoundPhaseVerify     RoundPhase = "verify"
 	RoundPhaseLearn      RoundPhase = "learn"
+	// RoundPhaseDecide (DM-20260707-001 PR-D) marks the Stage-5 Decision
+	// node transition between Verify and Learn. Reserved for future
+	// PR-E Learn-attribution splitting where Learn reads DecisionKind
+	// as a per-round attribute; PR-D does not bump the round's Phase
+	// to RoundPhaseDecide — Decision runs inline as part of the Verify
+	// → Learn transition (see item_pipeline.go runDecisionStage call
+	// site around line 620).
 	RoundPhaseDecide     RoundPhase = "decide"
 	RoundPhaseAwaitChild RoundPhase = "await_child"
 )
@@ -140,6 +147,28 @@ type WorkItemPipelineRound struct {
 	// SpawnInline. Nil when the round pre-dates the contract or when
 	// Verify chose not to compute one (legacy Verifier fall-back).
 	ResolutionReport *interfaces.ResolutionReport `json:"resolution_report,omitempty"`
+
+	// DecisionKind (DM-20260707-001 PR-D, T51) — the wire-format
+	// DecisionKind produced by the Stage-5 Decision node (accept |
+	// retry | child_worker | parent_rollup | human_review). Set on
+	// every round that ran through ItemPipelineRunner after PR-D;
+	// zero value (DecisionAccept) on legacy pre-PR-D rounds.
+	DecisionKind string `json:"decision_kind,omitempty"`
+	// DecisionReason is the human-readable explanation matching the
+	// mapping-table row that fired ("verdict_pass", "verdict_fail+
+	// attempt_0<max_1", "all_siblings_decided (3/3)", …). Always
+	// populated when DecisionKind is set.
+	DecisionReason string `json:"decision_reason,omitempty"`
+	// DecisionMapRow records which row of the 11-row static mapping
+	// table fired. Range 0..11; 0 = safety-net fallback ("map miss")
+	// and 11 = plan_error path. T-registry consumers key on this for
+	// dashboards.
+	DecisionMapRow int `json:"decision_map_row,omitempty"`
+	// DecisionJSON is the canonical JSON-encoded Decision payload
+	// (kind + reason + map_row + next_spec + decided_at) persisted
+	// for D5 dashboards + Learn attribution. See
+	// sessionorchestrator.MarshalDecisionJSON.
+	DecisionJSON string `json:"decision_json,omitempty"`
 
 	StartedAt       time.Time         `json:"started_at,omitempty"`
 	CompletedAt     time.Time         `json:"completed_at,omitempty"`

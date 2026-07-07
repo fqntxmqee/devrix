@@ -61,6 +61,14 @@ type ItemPipelineRunner struct {
 	// companion helper). nil → DAG plan fall back to legacy path (defensive
 	// default so pre-PR-C callers continue to compile).
 	DAGExecutor wavescheduler.DAGExecutor
+	// DAGEnabled is the runtime gate (T29, devrix.d7.dag_executor.enabled,
+	// default false). When false, the multi-intent DAG fork at Run() is
+	// suppressed regardless of whether pl.DAG is set — staging rollout
+	// per proposal.md §6 ("first 5% → 100% across 2 weeks"). True means
+	// ops has flipped the flag and the DAG executor handles PlanDAG
+	// round trips. nil executor + true flag → degrade gracefully to
+	// legacy path (log warning, no panic).
+	DAGEnabled bool
 	// StreamingEmitter is the IM-side streaming emit adapter used by the
 	// PR-C DAG path. Decoupled from adapters.FeishuAdapter via this
 	// interface to avoid a test-only import cycle
@@ -139,6 +147,12 @@ type ItemPipelineDeps struct {
 	// → DAG path still runs, but no IM streaming card is emitted.
 	DAGExecutor     wavescheduler.DAGExecutor
 	StreamingEmitter StreamingEmitter
+	// DM-20260707-001 PR-D (T29): DAGEnabled gates the multi-intent fork
+	// at Run(). Mirrors config.DAGExecutor.Enabled. false (zero value)
+	// keeps the legacy single-WorkItem path even when DAGExecutor is
+	// wired; true flips the fork on. Defaults preserve backward
+	// compatibility for any pre-PR-D caller.
+	DAGEnabled bool
 }
 
 // NewItemPipelineRunner constructs an ItemPipelineRunner with the given deps.
@@ -178,6 +192,7 @@ func NewItemPipelineRunner(deps ItemPipelineDeps) (*ItemPipelineRunner, error) {
 		SemanticVerifier:      deps.SemanticVerifier,
 		DAGExecutor:           deps.DAGExecutor,
 		StreamingEmitter:      deps.StreamingEmitter,
+		DAGEnabled:            deps.DAGEnabled,
 	}, nil
 }
 
@@ -411,7 +426,14 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	// — fork on pl.DAG (NOT proposal.DAG; strategic plan proposals don't
 	// carry the DAG). The helper handles Execute + Verify + Learn
 	// internally and persists the rollup round, so we return immediately.
-	if pl != nil && pl.DAG != nil && pl.IntentSegmentSet != nil && r.DAGExecutor != nil {
+	//
+	// DM-20260707-001 PR-D (T29): the `r.DAGEnabled` gate is the
+	// runtime config flag (devrix.d7.dag_executor.enabled, default false).
+	// When ops has not flipped the flag, fall through to the legacy
+	// single-WorkItem path even if pl.DAG is non-nil — the fork is
+	// suppressed but the rest of the pipeline runs unchanged so the
+	// plan content still gets exercised via the legacy channels.
+	if r.DAGEnabled && pl != nil && pl.DAG != nil && pl.IntentSegmentSet != nil && r.DAGExecutor != nil {
 		// Build obsLookups once for the DAG path (the legacy Learn block
 		// at line ~585 builds the same slice; hoisting it here keeps the
 		// DAG helper's signature clean).
@@ -426,6 +448,15 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 			return nil, dagErr
 		}
 		return round, nil
+	}
+	// PR-D T29 degraded path: flag is OFF but Plan still emitted a DAG
+	// (e.g. a previous turn set it). Drop a single audit log so ops can
+	// notice the mismatch and investigate. The legacy path will run with
+	// the plan's Children if present, otherwise with Steps[0].
+	if !r.DAGEnabled && pl != nil && pl.DAG != nil {
+		slog.Debug("item_pipeline: dag_executor flag is OFF; falling through to legacy path despite PlanDAG",
+			"session_id", sessionID, "work_item_id", item.ID,
+			"dag_node_count", len(pl.DAG.Nodes))
 	}
 
 	ctx, endExecutePhase := r.enterMUPSPhase(ctx, sessionID, item.ID, workmodel.RoundPhaseExecute)
@@ -578,6 +609,19 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	exitReason := exitReasonForVerdict(verdict, sessionID)
 	endVerifyPhase(nil)
 
+	// DM-20260707-001 PR-D (T46-T51) — run the Stage-5 Decision node
+	// after Verify emits its verdict. The Decision node is a pure
+	// function over the 11-row static mapping table; no LLM, no IO,
+	// < 1ms. Its outputs (kind + reason + map_row + next_spec) get
+	// persisted to round.DecisionKind/DecisionReason/DecisionMapRow/
+	// DecisionJSON so D5 dashboards + Learn can read the routing
+	// decision without re-running Decide. Old workmodel.ApplyPipelineDecide
+	// is left intact for now — Decision's NextWorkItemSpec drives a
+	// future C-path spawn loop; the A/B/D/E paths piggyback on the
+	// existing SpawnPolicy machinery.
+	decision := r.runDecisionStage(sessionID, item, verdict, roundNo)
+	exitReason = exitReasonForDecision(exitReason, decision)
+
 	ctx, endLearnPhase := r.enterMUPSPhase(ctx, sessionID, item.ID, workmodel.RoundPhaseLearn)
 
 	// DM-20260626-009 hotfix: emit the 5th-node sub-span (system.anomaly_detect
@@ -691,8 +735,20 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		SemanticRetryHint:   semanticRetryHint,
 		DeliverableSchema:   deliverableSchema,
 		DeliverableContract: deliverableContract,
-		StartedAt:         started,
-		CompletedAt:       time.Now(),
+		// DM-20260707-001 PR-D (T51): persist the Stage-5 Decision node
+		// outcome. Kind/Reason/MapRow are the searchable fields; JSON is
+		// the canonical wire blob for D5 dashboards and Learn attribution.
+		DecisionKind:   decision.Kind.String(),
+		DecisionReason: decision.Reason,
+		DecisionMapRow: decision.MapRow,
+		StartedAt:      started,
+		CompletedAt:    time.Now(),
+	}
+	if decisionJSON, err := MarshalDecisionJSON(decision); err == nil {
+		round.DecisionJSON = decisionJSON
+	} else {
+		slog.Warn("item_pipeline: marshal decision JSON failed",
+			"session_id", sessionID, "work_item_id", item.ID, "err", err)
 	}
 	// DM-20260704-006 S4 Phase 2 wiring: compute the Verify → Decide
 	// ResolutionCoverage report from the Plan's ResolutionStrategies and
