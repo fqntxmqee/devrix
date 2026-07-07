@@ -9,6 +9,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/orchestration/mups/learn"
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"github.com/devrix/devrix/internal/layers/orchestration/sessionorchestrator"
+	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/contracts"
 )
@@ -33,6 +34,16 @@ type ItemPipelineWireDeps struct {
 	// into ItemPipelineRunner.SemanticConfig and constructs a
 	// DefaultSemanticVerifier when Enabled=true.
 	SemanticConvergence orchtypes.SemanticConvergenceConfig
+	// DAGExecutor (DM-20260707-001 PR-C) drives the multi-intent DAG
+	// path when Plan emits pl.DAG + pl.IntentSegmentSet. nil →
+	// ItemPipelineRunner.Run() falls back to the legacy single-WorkItem
+	// path (defensive default so pre-PR-C callers continue to compile).
+	DAGExecutor wavescheduler.DAGExecutor
+	// StreamingEmitter (DM-20260707-001 PR-C) is the IM-side streaming
+	// emit adapter (FeishuAdapter satisfies this via its EmitPartialCard
+	// / EmitFinalCard methods). nil → DAG path still runs inner Execute +
+	// Learn, but skips the IM streaming card emit.
+	StreamingEmitter sessionorchestrator.StreamingEmitter
 }
 
 // WireDefaultMUPSLearner constructs the in-process LP-1 learner used by both
@@ -109,6 +120,14 @@ func WireItemPipeline(deps ItemPipelineWireDeps) (*sessionorchestrator.ItemPipel
 		// degradation when LLMInvoker is unavailable).
 		SemanticConfig:    semanticCfg,
 		SemanticVerifier:  semanticVerifier,
+		// DM-20260707-001 PR-C: forward DAGExecutor + StreamingEmitter.
+		// Both are optional — when nil, Run() falls back to the legacy
+		// single-WorkItem path. The production bootstrap path doesn't
+		// construct a WaveScheduler / FeishuAdapter here today; a
+		// follow-up change (DM-20260707-002+) is responsible for
+		// wiring those into WireItemPipeline's caller.
+		DAGExecutor:      deps.DAGExecutor,
+		StreamingEmitter: deps.StreamingEmitter,
 	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("wire item pipeline: %w", err)

@@ -59,6 +59,12 @@ type (
 	ReputationEvidence = reputation.ReputationEvidence
 	ReputationStore    = reputation.ReputationStore
 
+	// ParentEvidence / ChildVerdict — re-exported from reputation (PR-C).
+	// ParentEvidence is the rollup aggregator's snapshot; ChildVerdict is
+	// one child's terminal Verdict + SegmentID for rollup audit lineage.
+	ParentEvidence = reputation.ParentEvidence
+	ChildVerdict   = reputation.ChildVerdict
+
 	// ScheduledMemory — re-exported from memory (concrete type, not the
 	// memory.Memory interface, so DefaultLearner can call ListDue).
 	ScheduledMemory = memory.ScheduledMemory
@@ -111,6 +117,12 @@ var (
 	NewReputationEvidence  = reputation.NewReputationEvidence
 	BayesianUpdate         = reputation.BayesianUpdate
 	BuildAdaptivePrior     = prior.BuildAdaptivePrior
+
+	// PR-C rollup aggregator helpers — re-exported so sessionorchestrator
+	// can call them without importing reputation directly (keeps the
+	// learn→reputation import boundary clean for downstream callers).
+	AggregateParentEvidence  = reputation.AggregateParentEvidence
+	SynthesizeRollupVerdict  = reputation.SynthesizeRollupVerdict
 
 	// Memory constructors (re-exported from memory package so callers
 	// don't need to import the subpackage just to construct the default
@@ -190,7 +202,12 @@ type DefaultLearner struct {
 	Builder      *AssetBuilder
 	// BayesianUpdater is the verdict → prior-evidence mutator. Injected so
 	// tests can supply a stub; production passes BayesianUpdate.
-	BayesianUpdater func(prior *ReputationEvidence, v workmodel.Verdict) *ReputationEvidence
+	//
+	// DM-20260707-001 PR-C Risk A4: signature is now (prior, verdict) →
+	// (*ReputationEvidence, error). prior==nil surfaces ErrReputationStoreUnavailable
+	// so callers MUST handle the cold-start path explicitly (matches
+	// BayesianUpdate's new public signature).
+	BayesianUpdater func(prior *ReputationEvidence, v workmodel.Verdict) (*ReputationEvidence, error)
 }
 
 // NewDefaultLearner wires the 3 memory channels + reputation store +
@@ -268,7 +285,13 @@ func (l *DefaultLearner) Learn(ctx context.Context, req LearnRequest) ([]*Learni
 				return nil, fmt.Errorf("learn: cold-start reputation: %w", err)
 			}
 		}
-		next := l.BayesianUpdater(priorEv, req.Verdict)
+		next, err := l.BayesianUpdater(priorEv, req.Verdict)
+		if err != nil {
+			return nil, fmt.Errorf("learn: BayesianUpdater: %w", err)
+		}
+		if next == nil {
+			return nil, fmt.Errorf("learn: BayesianUpdater returned nil evidence for prior=%+v", priorEv)
+		}
 
 		// DM-20260629-001 PR-6 t-span-coverage (T39): emit a dedicated
 		// D7_LongTerm_Reputation_Update span around the BayesianUpdate so

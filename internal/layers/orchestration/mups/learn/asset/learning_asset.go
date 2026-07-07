@@ -139,6 +139,14 @@ type LearningAsset struct {
 	// SourceVerdictIDs — LP-5 (≥1).
 	SourceVerdictIDs []string
 
+	// SourcePlanNodeIDs (DM-20260707-001 PR-C, codex Risk A2 HIGH):
+	// per-segment attribution lineage. For per-child Learn calls, this is
+	// the single SegmentID of the child whose completion triggered the
+	// Learn. For rollup Learn calls, this is the union of all child
+	// SegmentIDs that contributed to the synthesized rollup Verdict. Empty
+	// for legacy single-WorkItem Learn paths.
+	SourcePlanNodeIDs []string
+
 	// Content — 5 polymorphic classes (必填).
 	Content AssetContent
 

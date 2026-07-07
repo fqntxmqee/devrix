@@ -110,7 +110,17 @@ func NewReputationEvidence(sessionID string, trackMode TrackMode) (*ReputationEv
 // Mean is preserved from the prior (cold-start default = 0 from a fresh
 // NewReputationEvidence, or Developer Beta(5,3) → 0.625 after merging in
 // BuildAdaptivePrior).
-func BayesianUpdate(prior *ReputationEvidence, verdict workmodel.Verdict) *ReputationEvidence {
+//
+// DM-20260707-001 PR-C Risk A4 (codex): signature changed from
+// `(prior, verdict) → *ReputationEvidence` to
+// `(prior, verdict) → (*ReputationEvidence, error)`. prior==nil returns
+// (nil, ErrReputationStoreUnavailable) so callers MUST handle the cold-start
+// path explicitly via NewReputationEvidence(cold-start defaults). PR-C's
+// per-segment Learn amplifies the latent panic risk on the prior==nil path.
+func BayesianUpdate(prior *ReputationEvidence, verdict workmodel.Verdict) (*ReputationEvidence, error) {
+	if prior == nil {
+		return nil, fmt.Errorf("%w: prior is nil (cold start; bootstrap via NewReputationEvidence)", ErrReputationStoreUnavailable)
+	}
 	next := *prior // immutable copy
 	next.UpdateCount++
 	next.LastUpdated = time.Now()
@@ -147,7 +157,7 @@ func BayesianUpdate(prior *ReputationEvidence, verdict workmodel.Verdict) *Reput
 		next.ConfidenceLow, next.ConfidenceHigh = wilsonScoreInterval(next.Alpha, next.Beta, 0.95)
 	}
 
-	return &next
+	return &next, nil
 }
 
 // wilsonScoreInterval computes the Wilson Score confidence interval.

@@ -55,6 +55,20 @@ type ItemPipelineRunner struct {
 	// SemanticConfig controls when SemanticVerifier is consulted. nil →
 	// DefaultSemanticSimilarityConfig() (Enabled=false by default).
 	SemanticConfig SemanticSimilarityConfig
+	// DAGExecutor drives the multi-intent DAG path (DM-20260707-001 PR-C).
+	// When Plan emits pl.DAG + pl.IntentSegmentSet, Run() forks from the
+	// legacy WorkItemExecutor path into executePlanDAG (this file's
+	// companion helper). nil → DAG plan fall back to legacy path (defensive
+	// default so pre-PR-C callers continue to compile).
+	DAGExecutor wavescheduler.DAGExecutor
+	// StreamingEmitter is the IM-side streaming emit adapter used by the
+	// PR-C DAG path. Decoupled from adapters.FeishuAdapter via this
+	// interface to avoid a test-only import cycle
+	// (sessionorchestrator → adapters → capture → sessionorchestrator-test).
+	// *adapters.FeishuAdapter satisfies this interface implicitly via its
+	// EmitPartialCard / EmitFinalCard methods. nil → DAG path still runs
+	// the inner Execute + Learn, but skips the IM streaming card emit.
+	StreamingEmitter StreamingEmitter
 	// Emit is the deprecated single-emit field. Use ItemPipelineRunOpts.Emit
 	// on Run() / RunParallelExplore() so concurrent sessions each carry
 	// their own emit closure instead of racing on a shared struct field.
@@ -120,6 +134,11 @@ type ItemPipelineDeps struct {
 	// pre-check still runs but short-circuits when verifier is nil).
 	SemanticConfig   SemanticSimilarityConfig
 	SemanticVerifier SemanticVerifier
+	// DM-20260707-001 PR-C: DAGExecutor + StreamingEmitter. Optional —
+	// nil DAGExecutor → legacy single-WorkItem path; nil StreamingEmitter
+	// → DAG path still runs, but no IM streaming card is emitted.
+	DAGExecutor     wavescheduler.DAGExecutor
+	StreamingEmitter StreamingEmitter
 }
 
 // NewItemPipelineRunner constructs an ItemPipelineRunner with the given deps.
@@ -157,6 +176,8 @@ func NewItemPipelineRunner(deps ItemPipelineDeps) (*ItemPipelineRunner, error) {
 		StrategicPlanProposer: deps.StrategicPlanProposer,
 		SemanticConfig:        semanticCfg,
 		SemanticVerifier:      deps.SemanticVerifier,
+		DAGExecutor:           deps.DAGExecutor,
+		StreamingEmitter:      deps.StreamingEmitter,
 	}, nil
 }
 
@@ -384,6 +405,28 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 		pl.Kind = plan.CommitmentPlan
 	}
 	endPlanPhase(nil)
+
+	// DM-20260707-001 PR-C: fork into the multi-intent DAG execution path
+	// when Plan emits a non-nil DAG + IntentSegmentSet. codex Risk A8 HIGH
+	// — fork on pl.DAG (NOT proposal.DAG; strategic plan proposals don't
+	// carry the DAG). The helper handles Execute + Verify + Learn
+	// internally and persists the rollup round, so we return immediately.
+	if pl != nil && pl.DAG != nil && pl.IntentSegmentSet != nil && r.DAGExecutor != nil {
+		// Build obsLookups once for the DAG path (the legacy Learn block
+		// at line ~585 builds the same slice; hoisting it here keeps the
+		// DAG helper's signature clean).
+		dagObsLookups := make([]learn.ObservationLookup, 0, len(obsIDs))
+		for _, id := range obsIDs {
+			dagObsLookups = append(dagObsLookups, observationRef(id))
+		}
+		round, dagErr := r.executePlanDAG(
+			ctx, sessionID, userID, item, pl, directive, roundNo, trigger, started,
+			isParentRollup, dagObsLookups)
+		if dagErr != nil {
+			return nil, dagErr
+		}
+		return round, nil
+	}
 
 	ctx, endExecutePhase := r.enterMUPSPhase(ctx, sessionID, item.ID, workmodel.RoundPhaseExecute)
 

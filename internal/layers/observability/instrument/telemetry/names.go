@@ -257,6 +257,36 @@ const (
 	// gaps_closed_count + frame_delta_consumed flag for Phase 3
 	// cross-round convergence tracking.
 	OpD7_S9_Execute_ConvergenceMetric_Emit = "D7_Execute_ConvergenceMetric_Emit"
+
+	// --- DM-20260707-001 PR-C: 5 streaming + Learn per-segment spans ---
+	// PR-C introduces 5 inner-layer Span ops for the DAG→IM streaming +
+	// per-segment Learn pipeline. All follow the canonical
+	// D7_<Component>_<Action> naming convention (codex Risk A6 MEDIUM);
+	// the legacy D7-S15-PRC-* proposal from the consensus packet was
+	// rejected because it would have broken Jaeger queries that filter
+	// by operation-prefix.
+	//
+	// D7 DAG-Executor Stream-Emit (P0): wraps each SegmentEmit from the
+	// wavescheduler.DAGExecutor. Records session_id + segment_id +
+	// is_final + exit_code so dashboards can graph per-child latency +
+	// abort patterns.
+	OpD7_DAG_Executor_Stream_Emit = "D7_DAG_Executor_Stream_Emit"
+	// D7 Emit-Dedup Mark (P1): wraps EmitDedup.MarkAndCheck so dashboards
+	// can measure dedup-hit ratio (debug log only; emit is no-op on hit).
+	OpD7_Emit_Dedup_Mark = "D7_Emit_Dedup_Mark"
+	// D7 Streaming-Emitter Partial (P0): wraps FeishuAdapter.EmitPartialCard.
+	// Records chat_id + idempotency_key + content_runes + card_sequence so
+	// streaming-related failures (rate limit, expired card) are observable.
+	OpD7_Streaming_Emitter_Partial = "D7_Streaming_Emitter_Partial"
+	// D7 Streaming-Emitter Final (P0): wraps FeishuAdapter.EmitFinalCard.
+	// Carries the synthesized rollup payload length + dedup key so the
+	// final-overrides-partial semantic is traceable.
+	OpD7_Streaming_Emitter_Final = "D7_Streaming_Emitter_Final"
+	// D7 Learn Per-Segment (P0): wraps learn.DefaultLearner.Learn for
+	// per-segment calls. Records segment_id + parent_id + is_rollup +
+	// evidence_segment_count so reputation lineage is traceable across
+	// the multi-intent decompose → rollup Learn flow.
+	OpD7_Learn_Per_Segment = "D7_Learn_Per_Segment"
 )
 
 // SpanAttrs returns the extra attributes only. Layer/component are intentionally
