@@ -1,0 +1,24 @@
+change_id: devrix-d7-multi-intent-observation-decompose
+title: D7 multi-intent observation decompose + Plan DAG + parallel Execute
+demand_id: DM-20260707-001
+status: S2_Proposal
+created: 2026-07-07
+priority: P0
+pr_count: 4
+reporter: user
+sprint: devrix-d7-v7
+
+domain_tags:
+  - orchestration
+  - d7
+language_tags:
+  - go
+related_changes:
+  - devrix-d7-mups-v4-phase4-verify-promotion  # Decompose pipeline ancestor
+  - devrix-d7-mups-v4-phase6-observe-learner-wiring  # Observation foundation
+  - DM-20260706-011  # observational_answer fast-path (predecessor capability)
+supersedes: []
+---
+
+# This YAML is the S2_Proposal hand-off. After S7_Archived, archive this
+# directory to openspec/archive/<YYYY-MM-DD>-<change-id>/ and remove from changes/.
