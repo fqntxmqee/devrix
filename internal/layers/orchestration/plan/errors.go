@@ -71,6 +71,17 @@ type ValidateOpts struct {
 	MaxBlastRadiusFileCount    int
 	MaxBlastRadiusAPICallCount int
 	MaxBlastRadiusTokenCost    int
+	// DAG caps (DM-20260707-001 PR-A1 T13). When non-zero, override
+	// validateDAG thresholds. Default is 10 nodes / 8 fan-out.
+	MaxDAGNodes int
+	MaxFanOut   int
+}
+
+func (o ValidateOpts) dagOpts() PlanDAGValidationOpts {
+	return PlanDAGValidationOpts{
+		MaxDAGNodes: o.MaxDAGNodes,
+		MaxFanOut:   o.MaxFanOut,
+	}
 }
 
 func (o ValidateOpts) fileLimit() int {

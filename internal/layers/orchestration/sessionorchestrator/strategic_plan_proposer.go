@@ -34,6 +34,13 @@ type StrategicPlanInput struct {
 	ParentScopeIn []string
 	// UncertaintyMean is the WorkItem's stored uncertainty at plan time (CC-U4).
 	UncertaintyMean float64
+	// Report is the full UncertaintyReport from Observe. DM-20260706-009:
+	// needed by the single-mode gate so it can detect high-strength ObsFact
+	// rows (e.g. "1+1=2") and bypass the uncertainty_mean threshold — these
+	// facts mean the question is already answered, so single-mode is the
+	// correct execution_mode even when other low-strength observations drag
+	// UncertaintyMean above 0.45.
+	Report orchtypes.UncertaintyReport
 	// PriorParseReject is compact JSON from the previous round's PlanParseReject field.
 	PriorParseReject string
 	// ResolutionStrategies (DM-20260704-006, RC-1) — cross-round feedback
@@ -704,11 +711,27 @@ func applyBudgetCap(prop *StrategicPlanProposal, budget workmodel.DivergenceBudg
 	return nil
 }
 
+// highConfidenceFactThreshold (DM-20260706-009): when a CatBusiness ObsFact
+// with strength ≥ this threshold exists in the Observe report, the question
+// is considered already-answered (e.g. "1+1=2") and the single-mode gate
+// MUST NOT force a decompose. This avoids the trivial-Q&A failure where
+// unrelated low-strength observations dragged the business mean above the
+// 0.45 uncertainty gate even though the user asked a question with a
+// deterministic answer.
+const highConfidenceFactThreshold = 0.9
+
 func applySingleModeUncertaintyGate(prop *StrategicPlanProposal, in StrategicPlanInput) error {
 	if prop == nil || prop.ExecutionMode != "single" {
 		return nil
 	}
 	if in.UncertaintyMean < workmodel.SingleModeUncertaintyThreshold {
+		return nil
+	}
+	// Fast-path (DM-20260706-009): a high-strength ObsFact means the question
+	// is already answered. Single mode is the right call — Plan should just
+	// emit the fact as the deliverable. Bypass the gate so the rejection
+	// doesn't force a useless decompose + Execute + bash echo cycle.
+	if hasHighStrengthFact(in.Report, highConfidenceFactThreshold) {
 		return nil
 	}
 	return &StrategicPlanReject{

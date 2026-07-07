@@ -14,6 +14,7 @@ import (
 	"github.com/devrix/devrix/internal/layers/orchestration/hardening"
 	"github.com/devrix/devrix/internal/layers/orchestration/interfaces"
 	"github.com/devrix/devrix/internal/layers/orchestration/mups/learn"
+	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"github.com/devrix/devrix/internal/layers/orchestration/plan"
 	"github.com/devrix/devrix/internal/layers/orchestration/wavescheduler"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
@@ -227,6 +228,41 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	}
 	endObservePhase(nil)
 
+	// DM-20260706-011 observational_answer fast-path: when Observe emits a
+	// high-strength CatBusiness ObsFact with no ObsUncertainty, skip the
+	// Plan + Execute + Verify 3 nodes and emit ObsFact.Statement directly
+	// as the user-visible finalText. Learn still runs so reputation scoring
+	// keeps observing the observer's accuracy. Saves ~1 LLM call + 3-5s
+	// latency for trivial deterministic Q&A (1+1=几, 2×3=几, 法国首都是哪).
+	//
+	// Gates (all required):
+	//   1. !isRollup && !isDeliverableSynth && !isParentRollup
+	//   2. r.Learner != nil (Learn is the only reputation writer)
+	//   3. !hasObsUncertainty(report) — any unresolved question blocks fast-return
+	//   4. pickHighStrengthBusinessFact(report, 0.85) returns a non-empty
+	//      Statement (CatBusiness, strength ≥ 0.85 — matches
+	//      maxLLMObsFactStrength cap, so the LLM proposer can hit it
+	//      deterministically without bypassing validation)
+	//
+	// Degradation: any gate miss → fall through to the legacy Plan+Execute
+	// path with no error.
+	if !isRollup && !isDeliverableSynth && !isParentRollup && r.Learner != nil &&
+		!hasObsUncertainty(report) {
+		if obsID, factStmt, ok := pickHighStrengthBusinessFact(report, 0.85); ok {
+			round, fpErr := r.maybeObservationalAnswer(ctx, sessionID, item, report, obsIDs, obsID, factStmt, started, roundNo, frame.Trigger)
+			if fpErr != nil {
+				// Fast-path construction failed (e.g. tree mutation error);
+				// fall through to the legacy Plan+Execute path. The user's
+				// experience is "slightly slower" not "error".
+				slog.Warn("item_pipeline: observational_answer fast-path failed; falling through to Plan",
+					"session_id", sessionID, "work_item_id", item.ID,
+					"obs_fact_id", obsID, "err", fpErr)
+			} else if round != nil {
+				return round, nil
+			}
+		}
+	}
+
 	ctx, endPlanPhase := r.enterMUPSPhase(ctx, sessionID, item.ID, workmodel.RoundPhasePlan)
 
 	var strategic *StrategicPlanProposal
@@ -260,6 +296,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 			ParentScopeIn:   parentScopeIn,
 			UncertaintyMean: item.Uncertainty,
 			PriorParseReject: priorPlanReject,
+			Report:          report,
 		})
 		if propErr == nil && prop != nil {
 			strategic = prop
@@ -1061,6 +1098,156 @@ func buildArtifactFromWorkItemResult(pl *plan.Plan, item *workmodel.WorkItem, se
 		art.SourcePlanID = pl.ID
 	}
 	return art
+}
+
+// observationalAnswerSourceLabel is the artifact Metadata["source"] value
+// emitted by the DM-20260706-011 fast-path. Used by dashboards / D6 learners
+// to count trivial Q&A traffic without parsing the work item's directive.
+const observationalAnswerSourceLabel = "observational_answer_fastpath"
+
+// observationalAnswerLearnHint is the artifact Metadata["learn_hint"] value.
+// Records the ObsFact ID + strength so Learn can build the round's
+// provenance without re-walking the UncertaintyReport.
+type observationalAnswerLearnHint struct {
+	ObsFactID string  `json:"obs_fact_id"`
+	Strength  float64 `json:"strength"`
+	Statement string  `json:"statement"`
+}
+
+// maybeObservationalAnswer is the DM-20260706-011 fast-path implementation.
+// Called after Observe completes and before the Plan phase opens. When
+// pickHighStrengthBusinessFact returns a non-empty Statement (and the
+// caller has already verified no ObsUncertainty exists), this function
+// constructs a minimal Artifact + Verdict + Round, persists the round,
+// runs Learn for reputation scoring, and returns the round so the caller
+// can short-circuit the Plan + Execute + Verify phases.
+//
+// Returns (nil, err) only on infrastructure failures (tree mutation error).
+// All "skip" outcomes return (nil, nil) so the caller can fall through
+// to the legacy Plan+Execute path without losing the round.
+//
+// Emits a "fastpath" Jaeger span so trivial Q&A is observable in the trace
+// tree as a child of the D7_MUPS_Pipeline root, alongside the legacy
+// Plan/Execute/Verify sub-spans.
+func (r *ItemPipelineRunner) maybeObservationalAnswer(
+	ctx context.Context,
+	sessionID string,
+	item *workmodel.WorkItem,
+	report orchtypes.UncertaintyReport,
+	obsIDs []string,
+	obsFactID string,
+	statement string,
+	started time.Time,
+	roundNo int,
+	trigger string,
+) (*workmodel.WorkItemPipelineRound, error) {
+	_, endFastPath := hardening.EmitMUPSFastPath(ctx, sessionID, item.ID, "observational_answer")
+	defer endFastPath(nil)
+
+	ended := time.Now()
+	verdict := workmodel.Verdict{
+		Kind:       types.VerdictPass,
+		Confidence: 0.95, // observational answer is structurally high-confidence
+		Reason:     "observational_answer_fastpath",
+		SourceID:   "obs_fact:" + obsFactID,
+	}
+	// Use the original ObsFact strength as Confidence floor so reputation
+	// scoring reflects the LLM's stated certainty, not a flat 0.95.
+	if obs := findObservationByID(report, obsFactID); obs != nil && obs.Strength > 0 {
+		verdict.Confidence = obs.Strength
+	}
+
+	hintBytes, _ := json.Marshal(observationalAnswerLearnHint{
+		ObsFactID: obsFactID,
+		Strength:  verdict.Confidence,
+		Statement: statement,
+	})
+	art := &wavescheduler.Artifact{
+		TaskID:     item.ID,
+		SessionID:  sessionID,
+		WorkerType: wavescheduler.WorkerWorkItem,
+		Summary:    statement,
+		ExitCode:   0,
+		StartedAt:  started,
+		EndedAt:    ended,
+		Duration:   ended.Sub(started),
+		Metadata: map[string]any{
+			"source":         observationalAnswerSourceLabel,
+			"obs_fact_id":    obsFactID,
+			"learn_hint":     string(hintBytes),
+			"stop_reason":    "observational_answer",
+			"iterations":     0,
+			"tool_calls":     0,
+			"verdict_kind":   verdict.Kind.String(),
+			"verdict_source": verdict.SourceID,
+		},
+	}
+
+	// Build the round before persisting so the Learn call can include the
+	// artifact in its provenance without a second walk over the tree.
+	round := &workmodel.WorkItemPipelineRound{
+		RoundNo:           roundNo,
+		Trigger:           trigger,
+		WorkItemID:        item.ID,
+		SessionID:         sessionID,
+		ObservationIDs:    append([]string(nil), obsIDs...),
+		ArtifactID:        art.TaskID,
+		ArtifactSummary:   statement,
+		VerdictKind:       verdict.Kind,
+		VerdictConfidence: verdict.Confidence,
+		ExitReason:        "observational_answer",
+		UncertaintyMean:   0,
+	}
+
+	// Run Learn for reputation scoring. BayesianUpdate(VerdictPass) bumps
+	// Alpha → next round's EffectivePrior shifts toward the observer's
+	// recommendation. Failures here are non-fatal: the user already has
+	// their answer; reputation drift is recoverable next round.
+	var learningClass types.LearningClass
+	if r.Learner != nil {
+		obsLookups := make([]learn.ObservationLookup, 0, len(obsIDs))
+		for _, id := range obsIDs {
+			obsLookups = append(obsLookups, observationRef(id))
+		}
+		assets, err := r.Learner.Learn(ctx, learn.LearnRequest{
+			SessionID:    sessionID,
+			Verdict:      verdict,
+			Plan:         nil, // Plan node skipped — observational answer has no Plan
+			Artifact:     art,
+			Observations: obsLookups,
+		})
+		if err != nil {
+			slog.Warn("item_pipeline: observational_answer Learn failed (non-fatal); round still persisted",
+				"session_id", sessionID, "work_item_id", item.ID, "err", err)
+		} else if len(assets) > 0 && assets[0] != nil {
+			learningClass = assets[0].Class
+		}
+	}
+	round.LearningClass = learningClass
+
+	// Persist the round so the next round's Observe sees the artifact
+	// history and SessionWorkItem retrieval is consistent. Phase = Idle so
+	// downstream SpawnPolicy doesn't re-trigger the item.
+	if err := r.Tasks.Tree().ApplyPipelineRound(sessionID, item.ID, round, workmodel.RoundPhaseIdle); err != nil {
+		return nil, fmt.Errorf("item_pipeline: observational_answer ApplyPipelineRound: %w", err)
+	}
+
+	// Update the in-memory copy so callers reading item.LastRound see the
+	// fast-path round without re-fetching from the tree.
+	item.LastRound = round
+	return round, nil
+}
+
+// findObservationByID locates a single observation by ID in the report.
+// Returns nil if not found. Used by maybeObservationalAnswer to recover the
+// ObsFact's strength for verdict Confidence.
+func findObservationByID(report orchtypes.UncertaintyReport, id string) *orchtypes.Observation {
+	for i := range report.Observations {
+		if report.Observations[i].ID == id {
+			return &report.Observations[i]
+		}
+	}
+	return nil
 }
 
 // extractResolutionClaimsFromArtifact reads per-ObsID ResolutionClaim[]

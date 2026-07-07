@@ -15,8 +15,8 @@ func TestMUPSSemanticAppendix_GoldenHash(t *testing.T) {
 		loc  Locale
 		want string
 	}{
-		{"observe_zh", func(l Locale) string { return ObservationTaskAppendix(l) }, LocaleZH, "b7528e80d2f168be69b83bfc872fbbf69b641c57ff4e5a65587d5cd48c3b0c39"}, // DM-20260705-004: no duplicate node_role
-		{"observe_en", func(l Locale) string { return ObservationTaskAppendix(l) }, LocaleEN, "5533d2eb5be3ee90486a1637fadb2b3c530907101f3c6ca2fc910b5a552b4a6a"}, // DM-20260705-004: no duplicate node_role
+		{"observe_zh", func(l Locale) string { return ObservationTaskAppendix(l) }, LocaleZH, "4c82843ddb137e5ae02f1ebc95f5d839bb471ae0335c194410c6d9b057c6811c"}, // DM-20260706-011: observational_answer fast-path suffix added
+		{"observe_en", func(l Locale) string { return ObservationTaskAppendix(l) }, LocaleEN, "f6105f8d1c3903557d9d5d5aff9840cad8caec794047558e60b34bbfae316af6"}, // DM-20260706-011: observational_answer fast-path suffix added
 		{"plan_zh", func(l Locale) string { return StrategicPlanAppendix(l, dims) }, LocaleZH, "246c4e1affee56a146695a904b085a39e36a28b4f1ac753b607520e15ed6e5c9"},
 		{"plan_en", func(l Locale) string { return StrategicPlanAppendix(l, dims) }, LocaleEN, "e9d132780e028fc17cefda0c86764540cb00cf47c2bb3bcb6525e6c618575c73"},
 		{"execute_zh", func(l Locale) string { return WorkItemExecuteOutputHints(l) }, LocaleZH, "54b25bf342bf7e0ebdbf2ca3f2a033a70ba742c6dfcbcadce932db9dfda5a965"},

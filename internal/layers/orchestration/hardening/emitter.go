@@ -154,6 +154,20 @@ func EmitMemoryPersist(ctx context.Context, sessionID, channel, assetKind string
 	return c, func(err error) { endSpanWithError(span, err) }
 }
 
+// EmitMUPSFastPath wraps the DM-20260706-011 observational_answer fast-path.
+// childKind is a short label ("observational_answer" today; reserved for
+// future fast-paths like "plan_short_circuit"). Attributes are sized to fit
+// in 5-line dashboards; expand if more context is needed.
+func EmitMUPSFastPath(ctx context.Context, sessionID, workItemID, childKind string) (context.Context, func(error)) {
+	attrs := []tracer.Attribute{
+		{Key: "session_id", Value: sessionID},
+		{Key: "work_item_id", Value: workItemID},
+		{Key: "fastpath.kind", Value: childKind},
+	}
+	c, span := start(ctx, telemetry.OpD7_S6_MUPS_FastPath, attrs...)
+	return c, func(err error) { endSpanWithError(span, err) }
+}
+
 // --- S5 DecisionPlanning + Observe ---
 
 // EmitTaskGraphSynthesize wraps DecisionPlanning.SynthesizeTaskGraph. v6.0.0 S5-A33 P1.

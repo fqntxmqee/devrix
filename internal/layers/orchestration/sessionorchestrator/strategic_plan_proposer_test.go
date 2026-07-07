@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
+	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
 	"github.com/devrix/devrix/internal/shared/prompttags"
 )
@@ -366,6 +367,53 @@ func TestApplySingleModeUncertaintyGate_skipsNonSingle(t *testing.T) {
 	in := StrategicPlanInput{UncertaintyMean: 0.9}
 	if err := applySingleModeUncertaintyGate(prop, in); err != nil {
 		t.Fatalf("decompose must skip U gate: %v", err)
+	}
+}
+
+// DM-20260706-009: regression test for the 1+1=几? failure. A high-strength
+// CatBusiness ObsFact (e.g. "1+1=2", strength=0.99) means the question is
+// already answered; the single-mode gate must NOT force a decompose even
+// when unrelated low-strength observations push UncertaintyMean above the
+// 0.45 threshold.
+func TestApplySingleModeUncertaintyGate_fastPathOnHighStrengthFact(t *testing.T) {
+	fact, err := orchtypes.NewObservation(
+		orchtypes.ObsFact, orchtypes.CatBusiness, 0.99,
+		orchtypes.FactPayload{Statement: "1+1=2"},
+		"observe_proposer",
+	)
+	if err != nil {
+		t.Fatalf("setup fact: %v", err)
+	}
+	rep, err := orchtypes.NewUncertaintyReport("sess_test", []orchtypes.Observation{fact})
+	if err != nil {
+		t.Fatalf("setup report: %v", err)
+	}
+	prop := &StrategicPlanProposal{ExecutionMode: "single"}
+	in := StrategicPlanInput{UncertaintyMean: 0.60, Report: rep}
+	if err := applySingleModeUncertaintyGate(prop, in); err != nil {
+		t.Fatalf("high-strength ObsFact should bypass gate, got error: %v", err)
+	}
+}
+
+// DM-20260706-009: low-strength ObsFact (below 0.9) must NOT bypass the
+// gate — the fact isn't strong enough to claim "question answered".
+func TestApplySingleModeUncertaintyGate_noFastPathOnWeakFact(t *testing.T) {
+	weak, err := orchtypes.NewObservation(
+		orchtypes.ObsFact, orchtypes.CatBusiness, 0.5,
+		orchtypes.FactPayload{Statement: "weak claim"},
+		"observe_proposer",
+	)
+	if err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	rep, err := orchtypes.NewUncertaintyReport("sess_test", []orchtypes.Observation{weak})
+	if err != nil {
+		t.Fatalf("setup report: %v", err)
+	}
+	prop := &StrategicPlanProposal{ExecutionMode: "single"}
+	in := StrategicPlanInput{UncertaintyMean: 0.60, Report: rep}
+	if err := applySingleModeUncertaintyGate(prop, in); err == nil {
+		t.Fatalf("weak ObsFact must not bypass gate; expected reject")
 	}
 }
 
