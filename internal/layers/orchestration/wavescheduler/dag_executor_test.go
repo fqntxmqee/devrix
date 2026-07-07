@@ -445,8 +445,12 @@ func TestRunPlanDAG_DuplicateRun_FirstChannelClosed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first RunPlanDAG: %v", err)
 	}
-	// Give first wave a moment to start.
-	time.Sleep(20 * time.Millisecond)
+	// Give first wave enough time for dispatchLoop's first tick (20ms
+	// ticker) to register the worker handle before reentry fires. Without
+	// this margin, reentry's cancelWaveLocked runs against a wave with
+	// no handles and the worker completes naturally — a pre-existing
+	// scheduler race that surfaces here.
+	time.Sleep(80 * time.Millisecond)
 	// Second run: cancels the first wave.
 	ch2, err := exec.RunPlanDAG(ctx, "sess-7", "plan-7b", dag2, &segSet)
 	if err != nil {

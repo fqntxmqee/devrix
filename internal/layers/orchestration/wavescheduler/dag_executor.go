@@ -321,7 +321,7 @@ func (d *dagExecutor) spawnConsumer(ctx context.Context, sessionID, planDAGID st
 				return
 			case <-ticker.C:
 				// 1. Scan artifact store for new terminal nodes; emit SegmentEmit.
-				// drainAnyNewTerminals now drives emission from artifact presence,
+				// drainAnyNewTerminals drives emission from artifact presence,
 				// which avoids the Put→SetState race in scheduler.completeTask
 				// (artifact lands first, state transition lags).
 				drainAnyNewTerminals(d.scheduler, sessionID, planDAGID, graph, emitted, &failedMu, &failedIDs, out)
@@ -342,9 +342,25 @@ func (d *dagExecutor) spawnConsumer(ctx context.Context, sessionID, planDAGID st
 					return
 				}
 
-				// 3. All terminal & no failures → emit IsFinal on the
-				//    chronologically-last successful terminal, close.
+				// 3. All terminal & no failures → drain again first, then emit
+				//    IsFinal on the chronologically-last successful terminal.
+				//
+				// Why re-drain? completeTask writes Put then SetState, so a
+				// tick can observe state-X-Completed while state-Y's Put is
+				// still in flight (graph lock held). If we emit IsFinal on
+				// the first tick where AllTerminal returns true without a
+				// re-drain, the late node's regular SegmentEmit is dropped.
+				// We loop until AllTerminal AND no new emissions in one drain
+				// pass — bounded by graph.NodeCount() in the worst case but
+				// normally converges in 1-2 passes.
 				if graph.AllTerminal() {
+					for {
+						preLen := len(emitted)
+						drainAnyNewTerminals(d.scheduler, sessionID, planDAGID, graph, emitted, &failedMu, &failedIDs, out)
+						if len(emitted) == preLen {
+							break
+						}
+					}
 					emitFinalIfMissing(d.scheduler, sessionID, planDAGID, graph, emitted, out)
 					return
 				}
