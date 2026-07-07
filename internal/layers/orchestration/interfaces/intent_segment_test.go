@@ -333,3 +333,52 @@ func TestIntentSegmentSet_Validate_EmptySourceDirective_DoesNotError(t *testing.
 		t.Errorf("Validate on empty SourceDirective should NOT error, got: %v", err)
 	}
 }
+
+// =====================================================================
+// PR-A2 Segmenter sentinels (7120-7122) — DM-20260707-001
+//
+// Each error must:
+//   - return a *sharederrors.SentinelError carrying the canonical
+//     ORCH_INTENT_SEGMENTER_*_712x code
+//   - pass errors.Is(innerErr) check
+//   - carry a non-empty Message
+// =====================================================================
+
+func TestIntentSegmenterLLMTimeoutError(t *testing.T) {
+	e := NewIntentSegmenterLLMTimeoutError(950, 800)
+	if code := sharederrors.ErrorCode(e); code != "ORCH_INTENT_SEGMENTER_LLM_TIMEOUT_7120" {
+		t.Errorf("code=%q, want ORCH_INTENT_SEGMENTER_LLM_TIMEOUT_7120", code)
+	}
+	if !errors.Is(e, ErrIntentSegmenterLLMTimeout) {
+		t.Errorf("must wrap ErrIntentSegmenterLLMTimeout, got %v", e)
+	}
+	if e.Message == "" {
+		t.Errorf("Message is empty")
+	}
+}
+
+func TestIntentSegmenterLLMInvalidResponseError(t *testing.T) {
+	e := NewIntentSegmenterLLMInvalidResponseError("[truncated...]")
+	if code := sharederrors.ErrorCode(e); code != "ORCH_INTENT_SEGMENTER_LLM_INVALID_7121" {
+		t.Errorf("code=%q, want ORCH_INTENT_SEGMENTER_LLM_INVALID_7121", code)
+	}
+	if !errors.Is(e, ErrIntentSegmenterLLMInvalidResponse) {
+		t.Errorf("must wrap ErrIntentSegmenterLLMInvalidResponse, got %v", e)
+	}
+	if e.Message == "" {
+		t.Errorf("Message is empty")
+	}
+}
+
+func TestIntentSegmenterNoSegmentError(t *testing.T) {
+	e := NewIntentSegmenterNoSegmentError()
+	if code := sharederrors.ErrorCode(e); code != "ORCH_INTENT_SEGMENTER_NO_SEGMENT_7122" {
+		t.Errorf("code=%q, want ORCH_INTENT_SEGMENTER_NO_SEGMENT_7122", code)
+	}
+	if !errors.Is(e, ErrIntentSegmenterNoSegment) {
+		t.Errorf("must wrap ErrIntentSegmenterNoSegment, got %v", e)
+	}
+	if e.Message == "" {
+		t.Errorf("Message is empty")
+	}
+}

@@ -184,7 +184,8 @@ func (s *IntentSegmentSet) Validate() error {
 //
 // Code range notes (devrix convention, see orchtypes/errors.go):
 //   - 70xx was reserved for the original 4 sentinels (7001-7004 already used).
-//   - 7114-7118 reserved for PR-A1 IntentSegment sentinels.
+//   - 7114-7119 reserved for PR-A1 IntentSegment sentinels.
+//   - 7120-7122 reserved for PR-A2 IntentSegmenter sentinels.
 //   - 72xx reserved for PR-A1 PlanDAG sentinels (see plan/dag_validator.go).
 var (
 	ErrIntentSegmentInvalidID        = errors.New("orchtypes: IntentSegment.ID is empty")
@@ -194,6 +195,27 @@ var (
 	ErrIntentSegmentInvalidConfidence = errors.New("orchtypes: IntentSegment.Confidence out of [0, 1]")
 
 	ErrIntentSegmentSetEmpty = errors.New("orchtypes: IntentSegmentSet requires len(Segments) >= 1")
+
+	// PR-A2 sentinels (7120-7122). These surface IntentSegmenter-specific
+	// failures (LLM timeout, malformed response, empty production). They are
+	// NOT returned by IntentSegment.Validate() — that grammar check is owned
+	// by 7114-7119. These are wired through SegmenterDispatcher.Segment().
+
+	// ErrIntentSegmenterLLMTimeout — LLM call exceeded the configured budget
+	// (default 800ms). Dispatcher falls back to RuleBased. Never bubbles up
+	// to the caller unless RuleBased also fails.
+	ErrIntentSegmenterLLMTimeout = errors.New("orchtypes: IntentSegmenter LLM call exceeded timeout budget")
+
+	// ErrIntentSegmenterLLMInvalidResponse — LLM returned text that failed
+	// JSON parsing (no JSON object/array detected, or ParseWholeBody
+	// rejected). Dispatcher falls back to RuleBased.
+	ErrIntentSegmenterLLMInvalidResponse = errors.New("orchtypes: IntentSegmenter LLM returned unparseable response")
+
+	// ErrIntentSegmenterNoSegment — Segmenter exhausted LLM and RuleBased
+	// paths without producing ≥1 segment. Should not happen in practice
+	// (RuleBased always returns ≥1 lazy fallback), but guards against
+	// future implementations that might return empty sets.
+	ErrIntentSegmenterNoSegment = errors.New("orchtypes: IntentSegmenter produced 0 segments (invariant violation)")
 )
 
 // Wrap helpers — emit *sharederrors.SentinelError with stable ORCH_*_71xx
@@ -207,6 +229,11 @@ var (
 //   ORCH_INTENT_SEGMENT_PRIORITY_7117
 //   ORCH_INTENT_SEGMENT_CONFIDENCE_7118
 //   ORCH_INTENT_SET_EMPTY_7119
+//
+// PR-A2 (see reviews/pr-a2-codex-consensus-2026-07-07.md):
+//   ORCH_INTENT_SEGMENTER_LLM_TIMEOUT_7120
+//   ORCH_INTENT_SEGMENTER_LLM_INVALID_7121
+//   ORCH_INTENT_SEGMENTER_NO_SEGMENT_7122
 func NewIntentSegmentInvalidIDError() *sharederrors.SentinelError {
 	return sharederrors.WithCode(
 		"ORCH_INTENT_SEGMENT_ID_7114",
@@ -253,4 +280,38 @@ func NewIntentSegmentSetEmptyError() *sharederrors.SentinelError {
 		"IntentSegmentSet requires at least one segment",
 		ErrIntentSegmentSetEmpty,
 	)
+}
+
+// PR-A2 Segmenter sentinels (7120-7122). Wrap helpers live here, next to
+// the inner errors, so all 9 IntentSegment-related sentinels share one
+// audit-trail package.
+func NewIntentSegmenterLLMTimeoutError(elapsedMs int64, budgetMs int64) *sharederrors.SentinelError {
+	return sharederrors.WithCode(
+		"ORCH_INTENT_SEGMENTER_LLM_TIMEOUT_7120",
+		fmt.Sprintf("IntentSegmenter LLM call timed out: elapsed=%dms budget=%dms", elapsedMs, budgetMs),
+		fmt.Errorf("%w: elapsed=%dms budget=%dms", ErrIntentSegmenterLLMTimeout, elapsedMs, budgetMs),
+	)
+}
+
+func NewIntentSegmenterLLMInvalidResponseError(snippet string) *sharederrors.SentinelError {
+	return sharederrors.WithCode(
+		"ORCH_INTENT_SEGMENTER_LLM_INVALID_7121",
+		fmt.Sprintf("IntentSegmenter LLM returned unparseable response (snippet=%q)", snippet),
+		fmt.Errorf("%w: snippet=%q", ErrIntentSegmenterLLMInvalidResponse, snippet),
+	)
+}
+
+func NewIntentSegmenterNoSegmentError() *sharederrors.SentinelError {
+	return sharederrors.WithCode(
+		"ORCH_INTENT_SEGMENTER_NO_SEGMENT_7122",
+		"IntentSegmenter produced 0 segments (invariant violation)",
+		ErrIntentSegmenterNoSegment,
+	)
+}
+
+// IsIntentSegmenterNoSegmentError reports whether err is (or wraps) the
+// 7122 no-segment sentinel. Used by SegmenterDispatcher for log/audit
+// dispatching (PR-A2 Q5: classify LLM error reason for slog/metric).
+func IsIntentSegmenterNoSegmentError(err error) bool {
+	return err != nil && (errors.Is(err, ErrIntentSegmenterNoSegment))
 }
