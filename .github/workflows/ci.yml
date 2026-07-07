@@ -15,6 +15,13 @@ name: ci
 # - workflow 文件本身（.github/workflows/**）计入 code_changed=true，因为 CI 改动自身
 #   也要跑测试兜底。
 
+# CI guards (2026-07-08, follow-up from DM-20260706-008 + devrix-d6-evolution-prb):
+# - check-d7-d3-prepend-boundary.sh: D7→D3 API boundary guard (DM-20260706-008 follow-up P1)
+#   sess_1783333760211_6000 飞书卡片❌ 根因 = D7 proposer 绕过 messagesForLLMInvoke。
+#   扫描 sessionorchestrator/ 内 InvokeStream/InvokeNonStream 调用点，确保每个都经过 messagesForLLMInvoke 包装。
+# - check-orch-rename.sh: D6 evolution review fixes PR-B (DM-20260621-011) CI guard
+#   防止 orch_* → guard_* 重命名后回归 (6 metrics rename + 3 cross-pkg import cleanup)。
+
 on:
   push:
     branches: [main, master]
@@ -70,6 +77,14 @@ jobs:
       - name: D7 main-path architecture lint (TurnLoop + WorkTree + MUPS)
         if: steps.detect.outputs.code_changed == 'true'
         run: chmod +x ./scripts/lint-d7-main-path.sh && ./scripts/lint-d7-main-path.sh
+
+      - name: D7→D3 prepend boundary guard (DM-20260706-008)
+        if: steps.detect.outputs.code_changed == 'true'
+        run: chmod +x ./scripts/check-d7-d3-prepend-boundary.sh && ./scripts/check-d7-d3-prepend-boundary.sh
+
+      - name: D6 orch→guard rename guard (devrix-d6-evolution-prb)
+        if: steps.detect.outputs.code_changed == 'true'
+        run: chmod +x ./scripts/check-orch-rename.sh && ./scripts/check-orch-rename.sh
 
       - name: Build
         if: steps.detect.outputs.code_changed == 'true'
