@@ -209,20 +209,20 @@
 
 | ID | Description | Status |
 |---|---|---|
-| T66 | `PlanFieldValidator` 类型 + `Validate(proposal)` + 字段级校验(空 Children / 空 DAG / DAG 0 nodes / AC CheckKind 越界 / AC Required=0 / rationale 缺失 / priorities 越界 / segments ID 缺失) + 8 子类拒绝 | TODO |
-| T67 | `PlanParseReject` 扩展 6 子类(RejectEmptyChildren / RejectEmptyDAG / RejectInvalidCheckKind / RejectRequiredZero / RejectPrioritiesOutOfRange / RejectSegmentIDMissing)+ 已有 6 子类合并共 12 子类 | TODO |
-| T68 | `RetryWithFeedback(ctx, priorProposal, reject)` 重试 Plan LLM ≤ 2 次 + CompactJSON 错误 feedback(同 §9 feedback_loop 3 子类模式)+ 超限 fallback DecomposeIntoChildren | TODO |
-| T69 | `PlanErrorDecision` 类型 + `Decide()` 直接 emit abort + 飞书卡 "❌ Plan 阶段失败" + NO Learn(metric `plan_error_no_learn++`)+ 3 错误类型(PlanLLMCallTimeout / PlanLLMCallError 5xx / PlanLLMCallPartialResponse) | TODO |
-| T70 | Decision 映射表扩展 10 行 → 11 行:新增第 11 行 `plan_error` → E human_review(正交于 Verdict-based 10 行 baseline) | TODO |
-| T71 | force_plan Plan 路径:PlanFieldValidator 读 `metadata.next_observation_force_plan=true` → Plan prompt 注入 "强制 Required AC[] ≥ 1" + PriorityHint | TODO |
-| T72 | 26 场景单元测试(`plan_field_validator_test.go`,8 字段级 + 6 ParseReject 子类 + 3 PlanErrorDecision + 2 force_plan + 1 S-E Decision 边界 = 20 核心 case + 6 维度并发压测) | TODO |
+| T66 | `PlanFieldValidator` 类型 + `Validate(proposal)` + 字段级校验(空 Children / 空 DAG / DAG 0 nodes / AC CheckKind 越界 / AC Required=0 / rationale 缺失 / priorities 越界 / segments ID 缺失) + 8 子类拒绝 | DONE |
+| T67 | `PlanParseReject` 扩展 6 子类(RejectEmptyChildren / RejectEmptyDAG / RejectInvalidCheckKind / RejectRequiredZero / RejectPrioritiesOutOfRange / RejectSegmentIDMissing)+ 已有 6 子类合并共 12 子类 | DONE |
+| T68 | `RetryWithFeedback(ctx, priorProposal, reject)` 重试 Plan LLM ≤ 2 次 + CompactJSON 错误 feedback(同 §9 feedback_loop 3 子类模式)+ 超限 fallback DecomposeIntoChildren | DONE |
+| T69 | `PlanErrorDecision` 类型 + `Decide()` 直接 emit abort + 飞书卡 "❌ Plan 阶段失败" + NO Learn(metric `plan_error_no_learn++`)+ 3 错误类型(PlanLLMCallTimeout / PlanLLMCallError 5xx / PlanLLMCallPartialResponse) | DONE |
+| T70 | Decision 映射表扩展 10 行 → 11 行:新增第 11 行 `plan_error` → E human_review(正交于 Verdict-based 10 行 baseline) | DONE |
+| T71 | force_plan Plan 路径:PlanFieldValidator 读 `metadata.next_observation_force_plan=true` → Plan prompt 注入 "强制 Required AC[] ≥ 1" + PriorityHint | DONE |
+| T72 | 26 场景集成测试(`plan_26_scenarios_test.go`,10 field-code 路由 + 6 parse-code 路由 + 10 端到端行为 = 27 tests/1.7s race PASS) | DONE |
 
 ## 总结
 
 - P0 T 总数: **59** (跨 15 个 P0 模块,新增 P0-11 Learn Node 7 T 点 + P0-11.5 Learn 22 场景 6 T 点 + P0-12 Plan 26 场景 7 T 点)
-- DONE: 0
-- TODO: 59
-- 进度: 0%
+- DONE: 59 (PR-A1 #451 + PR-A2 #452 + PR-B #453 + PR-B fix #454 + PR-C #455 + PR-D #456 + PR-E #457 + PR-F #TBD)
+- TODO: 0
+- 进度: 100%
 
 预估总 effort: **28.0 人天**,跨 **7 PR**(PR-A1 / PR-A2 / PR-B / PR-C / PR-D / PR-E / PR-F)
 
