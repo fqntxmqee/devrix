@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -38,11 +39,17 @@ import (
 // It records the order in which Run was called (so priority + hard-cap tests
 // can assert dispatch order), waits delay before emitting "complete", and
 // returns errToReturn when set (so child-error tests can drive failures).
+//
+// Optional started channel is closed once on the first Run() invocation,
+// giving reentry-style tests a deterministic sync point instead of a fragile
+// time.Sleep racing against dispatchLoop scheduling under CI load.
 type dagExecutorStubRunner struct {
 	kind       WorkerType
 	delay      time.Duration
 	errToError error
 	callOrder  *atomic.Int64
+	started    chan struct{} // closed once on first Run; nil = no signal
+	startedOnce sync.Once
 }
 
 func (s *dagExecutorStubRunner) Kind() WorkerType { return s.kind }
@@ -50,6 +57,9 @@ func (s *dagExecutorStubRunner) Kind() WorkerType { return s.kind }
 func (s *dagExecutorStubRunner) Run(ctx context.Context, spec WorkerRunSpec) error {
 	if s.callOrder != nil {
 		s.callOrder.Add(1)
+	}
+	if s.started != nil {
+		s.startedOnce.Do(func() { close(s.started) })
 	}
 	if s.delay > 0 {
 		select {
@@ -426,7 +436,12 @@ func TestRunPlanDAG_DuplicateRun_FirstChannelClosed(t *testing.T) {
 	// Q4 cursor + codex: reentry cancels prior wave; prior channel is
 	// CLOSED (cursor #7: assert closed, not IsFinal).
 	var order atomic.Int64
-	runner := &dagExecutorStubRunner{kind: WorkerSubAgent, delay: 100 * time.Millisecond, callOrder: &order}
+	runner := &dagExecutorStubRunner{
+		kind:      WorkerSubAgent,
+		delay:     100 * time.Millisecond,
+		callOrder: &order,
+		started:   make(chan struct{}),
+	}
 	exec, _, _ := newDAGExecutorTestHarness(t, map[WorkerType]WorkerRunner{WorkerSubAgent: runner})
 
 	dag1 := &plan.PlanDAG{Nodes: []plan.PlanNode{{ID: "a", SegmentID: "seg_a"}}}
@@ -445,12 +460,17 @@ func TestRunPlanDAG_DuplicateRun_FirstChannelClosed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first RunPlanDAG: %v", err)
 	}
-	// Give first wave enough time for dispatchLoop's first tick (20ms
-	// ticker) to register the worker handle before reentry fires. Without
-	// this margin, reentry's cancelWaveLocked runs against a wave with
-	// no handles and the worker completes naturally — a pre-existing
-	// scheduler race that surfaces here.
-	time.Sleep(80 * time.Millisecond)
+	// Wait for the first wave's worker to be dispatched (handle registered
+	// in scheduler.handles + Run() entered) BEFORE issuing reentry. Without
+	// this, reentry's cancelWaveLocked runs against a wave with no handles
+	// and the worker completes naturally — a pre-existing scheduler race
+	// (cursor #4 + codex review). Was a fragile time.Sleep(80ms) that
+	// flaked under CI load; the started channel is deterministic.
+	select {
+	case <-runner.started:
+	case <-ctx.Done():
+		t.Fatalf("runner.started never fired; ctx err: %v", ctx.Err())
+	}
 	// Second run: cancels the first wave.
 	ch2, err := exec.RunPlanDAG(ctx, "sess-7", "plan-7b", dag2, &segSet)
 	if err != nil {
