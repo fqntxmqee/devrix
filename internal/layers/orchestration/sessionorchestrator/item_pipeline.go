@@ -256,8 +256,23 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	defer func() { endMUPS(nil) }()
 	ctx = contracts.WithMUPSPrepareCache(ctx)
 
+	// DM-20260706-004 (devrix-d7-frame-delta-phase2-production-wiring):
+	// construct the prior-round WorkItemExecContext (Phase 2 wiring) so
+	// observeWorkItem → buildObserveSignalInput → BuildObservePriorDelta
+	// can synthesize a non-zero FrameDelta on Round 2+. Item + Tasks are
+	// the only fields BuildObservePriorDelta reads; MaxItersOverride /
+	// DeliverableContract / PlanFrameDelta / Emit are all Execute-side
+	// concerns and intentionally stay nil/zero here. Designed not to
+	// affect subsequent Execute-side WithWorkItemExecContext construction
+	// at line ~513 — that path binds the per-Execute fields; both
+	// pointers reference the same WorkItem tree node so callers reading
+	// LastRound stay consistent across phases.
+	prevExecCtx := &WorkItemExecContext{
+		Item:  item,
+		Tasks: r.Tasks,
+	}
 	ctx, endObservePhase := r.enterMUPSPhase(ctx, sessionID, item.ID, workmodel.RoundPhaseObserve)
-	report, obsIDs, observeParseReject, err := observeWorkItem(ctx, sessionID, item, r.Classifier, r.Learner, r.TrackMode, r.Tasks, r.ObservationProposer)
+	report, obsIDs, observeParseReject, err := observeWorkItem(ctx, sessionID, item, r.Classifier, r.Learner, r.TrackMode, r.Tasks, prevExecCtx, r.ObservationProposer)
 	if err != nil {
 		endObservePhase(err)
 		return nil, err

@@ -32,6 +32,16 @@ func buildObserveRequestForItem(ctx context.Context, sessionID, message, trackMo
 	return orchtypes.NewObserveRequest(sessionID, message, prior)
 }
 
+// observeWorkItem drives the Observe MUPS phase for a single WorkItem.
+// It assembles deterministic + LLM-sourced observations, validates Obs*
+// payloads, and emits an UncertaintyReport carrying intent + Bayesian prior.
+//
+// DM-20260706-004 (devrix-d7-frame-delta-phase2-production-wiring):
+// prevExecCtx forwards the prior round's WorkItemExecContext (typically
+// built fresh by Run() at the top of each round) into
+// buildObserveSignalInput. Without this parameter, buildObserveSignalInput
+// always sees nil → BuildObservePriorDelta takes the zero-value branch
+// and the Phase 2 prior_artifact_summary span never fires in e2e.
 func observeWorkItem(
 	ctx context.Context,
 	sessionID string,
@@ -40,6 +50,7 @@ func observeWorkItem(
 	learner learn.Learner,
 	trackMode string,
 	tasks *workmodel.TaskManager,
+	prevExecCtx *WorkItemExecContext,
 	proposer ObservationProposer,
 ) (orchtypes.UncertaintyReport, []string, string, error) {
 	directive := itemDirective(item)
@@ -88,7 +99,7 @@ func observeWorkItem(
 		}
 		obs = append(obs, checklistObs...)
 	}
-	proposed, observeReject, _ := mergeProposedObservations(ctx, proposer, sessionID, item, tasks, prior)
+	proposed, observeReject, _ := mergeProposedObservations(ctx, proposer, sessionID, item, tasks, prevExecCtx, prior)
 	obs = append(obs, proposed...)
 	obs = append(obs, observeDeliverableSignals(item)...)
 	report, err := orchtypes.NewUncertaintyReport(sessionID, obs)
