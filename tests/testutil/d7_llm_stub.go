@@ -7,6 +7,7 @@ import (
 
 	"github.com/devrix/devrix/internal/layers/llmgateway"
 	"github.com/devrix/devrix/internal/layers/llmgateway/stream/adapter"
+	"github.com/devrix/devrix/internal/layers/orchestration/interfaces"
 )
 
 // D7LLMStub is a minimal IAdapter for D7 integration tests.
@@ -55,13 +56,36 @@ func (s *D7LLMStub) Protocol() string { return adapter.ProtocolStub }
 // Stream call. Each element of Responses is a sequence of chunks emitted
 // for one invocation (call 1 → Responses[0], call 2 → Responses[1], etc.).
 // If more calls are made than configured Responses, it reuses the last entry.
+//
+// FrameDeltaInject (DM-20260706-001, AC1) is an OPTIONAL test-only callback
+// invoked once per Stream call with the call index. When non-nil, its return
+// value is captured into LastFrameDelta (read by tests asserting the LLM
+// stub emitted a non-zero Plan-side FrameDelta). TESTUTIL ONLY — production
+// code never reads it; the callback exists to let integration tests assert
+// "Plan LLM output included execution_mode / deliverable_contract" without
+// standing up a real LLM.
 type SequenceLLMStub struct {
 	Responses [][]llmgateway.Chunk
 	CallCount atomic.Int64
+
+	// FrameDeltaInject is called per Stream call with idx (0-based). When
+	// non-nil, the returned FrameDelta is stored into LastFrameDelta so
+	// tests can assert the Plan LLM emitted a typed Plan-side delta.
+	// TESTUTIL ONLY — not read by production code.
+	FrameDeltaInject func(idx int) interfaces.FrameDelta
+
+	// LastFrameDelta holds the most recent value returned by
+	// FrameDeltaInject. atomic.Pointer so concurrent Stream goroutines
+	// don't race when reading it from the test main goroutine.
+	LastFrameDelta atomic.Pointer[interfaces.FrameDelta]
 }
 
 func (s *SequenceLLMStub) Stream(ctx context.Context, req *llmgateway.Request) (<-chan *llmgateway.AdapterChunk, error) {
 	idx := int(s.CallCount.Add(1)) - 1
+	if s.FrameDeltaInject != nil {
+		fd := s.FrameDeltaInject(idx)
+		s.LastFrameDelta.Store(&fd)
+	}
 	chunks := s.pickResponses(idx)
 
 	ch := make(chan *llmgateway.AdapterChunk, len(chunks)+1)
