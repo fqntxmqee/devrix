@@ -883,6 +883,72 @@ func TestObserveTraceE2E_AllKinds_PartitionRouting(t *testing.T) {
 	t.Logf("  ✓ Overall = %.3f (= mean of business strengths only, system excluded)", rep.Overall)
 }
 
+// =============================================================================
+// 测试 15: ObsFact + ObsUncertainty 混合 → fast-path 被 hasObsUncertainty 阻断
+//
+// 关键设计契约: 当 Observe LLM 同时返回确定性 fact + 不确定性 question 时,
+//   hasObsUncertainty(report) = true → item_pipeline.go:301 fast-path gate miss
+//   → 降级到 Plan+Execute+Verify (而不是直接 emit 一个 LLM 自己都不确定的答案)
+//
+// DM-20260706-011 hotfix 后的回归 guard: 之前用户发混合问题时会被 fast-path
+//   截胡 emit 一个矛盾的 partial answer, 飞书卡片显示一半 fact + 一半 question
+// =============================================================================
+
+func TestObserveTraceE2E_FactPlusUncertainty_FastPathBlocked(t *testing.T) {
+	llmRaw := `[
+		{"kind":"obs_fact","strength":0.85,"statement":"在标准算术下 2×3=6","evidence":[]},
+		{"kind":"obs_uncertainty","strength":0.6,"statement":"","question":"上下文用十进制还是二进制?","evidence":[]}
+	]`
+
+	proposer, llm := newTraceProposer(t, llmRaw, "你是 Devrix 助手。", i18n.LocaleZH)
+	in := ObserveSignalInput{
+		SessionID:  "sess_trace_mix",
+		WorkItemID: "wi_mix_001",
+		Directive:  "2×3=几?",
+	}
+
+	printBanner(t, "TestObserveTraceE2E_FactPlusUncertainty_FastPathBlocked — 混合场景")
+	printSystemAndUser(t, llm)
+	t.Logf("\n─── LLM raw response (canned) ───")
+	t.Logf("%s", llmRaw)
+
+	proposals, err := proposer.ProposeObservations(context.Background(), in)
+	if err != nil {
+		t.Fatalf("ProposeObservations: %v", err)
+	}
+	printProposals(t, proposals)
+
+	obs, _ := ValidateObservationProposals(proposals, in.SessionID, in.WorkItemID)
+	printReportPartition(t, in.SessionID, obs)
+
+	// ── 关键断言 ──
+	if len(proposals) != 2 {
+		t.Fatalf("expected 2 proposals (fact+uncertainty), got %d", len(proposals))
+	}
+	rep, _ := orchtypes.NewUncertaintyReport(in.SessionID, obs)
+
+	// 闸门 1: pickHighStrengthBusinessFact 仍然命中 (fact 强度 0.85)
+	_, factStmt, factHit := pickHighStrengthBusinessFact(rep, 0.85)
+	if !factHit {
+		t.Errorf("pickHighStrengthBusinessFact should hit on fact str=0.85, got miss")
+	} else {
+		t.Logf("  ✓ Gate 4 (pickHighStrength) HIT: stmt=%q", factStmt)
+	}
+
+	// 闸门 2 (关键!): hasObsUncertainty 应返回 true → 阻断 fast-path
+	uncBlocked := hasObsUncertainty(rep)
+	if !uncBlocked {
+		t.Errorf("❌ hasObsUncertainty = false, want true (LLM returned ObsUncertainty → gate 3 must block fast-path)")
+	} else {
+		t.Logf("  ✓ Gate 3 (hasObsUncertainty) BLOCKED: fact+uncertainty 矛盾信号 → fast-path 拒绝")
+	}
+
+	// 闸门 3: end-to-end gate combination — 两个闸门组合后 fast-path 必然 miss
+	if factHit && uncBlocked {
+		t.Logf("  ✓ 组合闸门: fact 命中 BUT uncertainty 阻断 → item_pipeline.go:301 fall through 到 Plan+Execute")
+	}
+}
+
 func abs(f float64) float64 {
 	if f < 0 {
 		return -f
@@ -891,7 +957,7 @@ func abs(f float64) float64 {
 }
 
 // =============================================================================
-// 测试 15: 真实 WorkItem flow — 整条 pipeline 跑, capture round.ArtifactSummary
+// 测试 16: 真实 WorkItem flow — 整条 pipeline 跑, capture round.ArtifactSummary
 // =============================================================================
 
 func TestObserveTraceE2E_FullPipeline_FactFastPath(t *testing.T) {
