@@ -2,7 +2,7 @@
 demand-id: DM-20260706-004
 title: D7 Phase 2 frame_delta production wiring — observation_proposer.go:257 nil → prevExecCtx 上游传参
 priority: P1
-status: S1_Proposal
+status: S7_Archived
 dsaft_domain: orchestration
 created: 2026-07-08
 parent_change: devrix-d7-mups-frame-delta-closure

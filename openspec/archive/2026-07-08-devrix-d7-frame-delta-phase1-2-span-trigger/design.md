@@ -2,7 +2,7 @@
 
 **Change ID:** `devrix-d7-frame-delta-phase1-2-span-trigger`
 **Demand ID:** DM-20260706-001
-**Status:** S3_Design
+**Status:** S7_Archived (2026-07-08)
 **Parent Proposal:** `proposal.md`
 **Parent Demand:** `demand.md`
 **Template:** `docs/methodology/detail-design-framework.md`（六段式）
