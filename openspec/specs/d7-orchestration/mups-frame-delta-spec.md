@@ -101,6 +101,41 @@ ComputeConvergenceMetric(subTurns []SubTurnRecord, lastMetric *ConvergenceMetric
 
 **0 LLM 承诺**：通过 `mock LLM 计数 = 0` 单测保证。
 
+### 3.4 Phase 1+2 e2e span 触发条件（testutil — DM-20260706-001）
+
+```
+SequenceLLMStub.FrameDeltaInject(idx int) FrameDelta  // callback per Stream call
+  ├─ 写入 LastFrameDelta atomic.Pointer（most-recent-wins 语义）
+  └─ TESTUTIL ONLY — production code never reads FrameDeltaInject or LastFrameDelta
+
+SeedPriorExecContext(t, stack, sessionID, workItemID, artifactSummary)
+  ├─ 1. wi.LastRound = &WorkItemPipelineRound{ArtifactSummary: summary}
+  ├─ 2. stack.TaskManager.Tree().ApplyPipelineRound(...) 持久化
+  ├─ 3. t.Cleanup 还原 wi.LastRound（test order independence）
+  └─ BuildObservePriorDelta 下次 Observe 时返回非零 FrameDelta
+```
+
+**Scope 隔离**：testutil_only — 0 production code 修改。Phase 1+3 production wiring 已通过 PR #443 + #444 闭环。Phase 2 production wiring 是 sibling change DM-20260706-004 (spec §3.5)。
+
+### 3.5 Phase 2 production wiring（DM-20260706-004 — sibling change）
+
+```
+ItemPipelineRunner.Run(ctx, sessionID, item, ...)
+  ├─ 1. prevExecCtx = &WorkItemExecContext{Item: item, Tasks: r.Tasks}
+  ├─ 2. observeWorkItem(ctx, sessionID, item, ..., prevExecCtx)  // 函数签名 +1 参数
+  │      └─ mergeProposedObservations(ctx, ..., prevExecCtx)
+  │            └─ buildObserveSignalInput(sessionID, item, tm, prevExecCtx)  // 替换 nil
+  │                  └─ BuildObservePriorDelta(ctx, sessionID, prevExecCtx)
+  │                        └─ prevExecCtx.Item.LastRound.ArtifactSummary → 非零 FrameDelta
+  └─ 3. emit d7.s5.observe.prior_delta.span with span_tag_complete=true
+```
+
+**根因（已确诊）**：production 调用链路上 `prevExecCtx` 在 2 处中断 — `ItemPipelineRunner.Run()` 持有 `WorkItemExecContext` 但未向下传；`mergeProposedObservations` 缺失参数 → `buildObserveSignalInput` 接收 nil → `BuildObservePriorDelta` 走首轮零值分支。
+
+**修复**：函数签名 +1 参数 + upstream 传参（~30 行 production code + ~30 行 unit test）。
+
+**e2e baseline**：合并后 `D7_Observe_PriorDelta_Inject` span count ≥ 2（Round 2+ 真实 prior 累积触发 span emit）。
+
 ## 4. Span 契约
 
 | Span Op | 触发点 | Attribute |
