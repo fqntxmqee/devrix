@@ -2,7 +2,7 @@
 demand-id: DM-20260706-001
 title: D7 MUPS Frame Delta Phase 1+2 spans 端到端触发 — testutil callback + seed helper 覆盖 e2e gap (scope 收窄)
 priority: P1
-status: S3_Rewriting
+status: S7_Archived
 dsaft_domain: orchestration
 created: 2026-07-06
 parent_change: devrix-d7-mups-frame-delta-closure

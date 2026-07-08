@@ -3,7 +3,7 @@
 **Change ID:** `devrix-d7-frame-delta-phase1-2-span-trigger`
 **Demand ID:** DM-20260706-001
 **Created:** 2026-07-06
-**Status:** S3_Design (等待 S3-Gate 三方 review → S4 实现)
+**Status:** S7_Archived (2026-07-08)
 **Demand:** [`demand.md`](demand.md)
 **OpenSpec YAML:** [`.openspec.yaml`](.openspec.yaml)
 **Parent Change:** `devrix-d7-mups-frame-delta-closure` (DM-20260705-010, S7_Archived 2026-07-05)

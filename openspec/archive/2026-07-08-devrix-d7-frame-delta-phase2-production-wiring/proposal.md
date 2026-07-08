@@ -3,7 +3,7 @@
 **Change ID:** `devrix-d7-frame-delta-phase2-production-wiring`
 **Demand ID:** DM-20260706-004
 **Created:** 2026-07-08
-**Status:** S1_Proposal → S2_Proposal (待 S3-Gate 三方 review)
+**Status:** S7_Archived (2026-07-08)
 **Demand:** [`demand.md`](demand.md)
 **OpenSpec YAML:** [`.openspec.yaml`](.openspec.yaml)
 **Parent Change:** `devrix-d7-mups-frame-delta-closure` (DM-20260705-010, S7_Archived 2026-07-05)

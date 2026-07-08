@@ -2,7 +2,7 @@
 
 **Change ID:** `devrix-d7-frame-delta-phase2-production-wiring`
 **Demand ID:** DM-20260706-004
-**Status:** S2_Proposal (待 S3-Gate 三方 review)
+**Status:** S7_Archived (2026-07-08)
 **Parent Proposal:** `proposal.md`
 **Parent Demand:** `demand.md`
 **Template:** `docs/methodology/detail-design-framework.md`（六段式）

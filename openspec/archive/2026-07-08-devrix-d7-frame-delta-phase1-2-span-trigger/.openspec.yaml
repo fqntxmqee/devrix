@@ -1,7 +1,7 @@
 change_id: devrix-d7-frame-delta-phase1-2-span-trigger
 priority: P1
 demand_id: DM-20260706-001
-status: s3_rewriting
+status: s7_archived
 domains: [D7]
 dsaft_scenarios:
   - D7-S5   # Observe 节点 prior_delta span 真实触发 (testutil seed 路径)
@@ -38,7 +38,6 @@ scope:
   zero_llm: true        # Phase 2/3 deterministic 0 LLM 承诺不变
 follow_up_gaps:
   - T19 S3-Gate 三方 review (codex + cursor + claude) — S3-Rewrite 后重提,codex CLI 已就位,cursor quota 待恢复
-  - DM-20260706-004 sibling change (Phase 2 production wiring) — 独立 production-side 修复
   - running system 真实飞书 session 验证 — out of scope,需 user action
 notes: |
   S3-Gate codex review (BLOCKED 2026-07-08) 拆分 Phase 2 production
@@ -46,3 +45,6 @@ notes: |
   原 change scope 收窄:testutil_only + e2e baseline 提升 (Phase 1+2 span
   count 从实测 baseline 2 提升到 ≥ 5)。sibling DM-20260706-002 + 003
   hotfixes 已 wired Phase 1+2 emission paths (commit 8b720e39 + 9c5fc866)。
+  PR #466 squash merged 2026-07-08 (testutil-only S4 完成),sibling
+  PR #467 squash merged 2026-07-08 (production-side S4 完成)。S7_Archived
+  2026-07-08 retroactive (ship-then-archive 模式 + 双 sibling 同期归档)。

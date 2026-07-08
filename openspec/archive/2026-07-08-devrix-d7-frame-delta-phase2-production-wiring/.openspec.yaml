@@ -1,7 +1,7 @@
 change_id: devrix-d7-frame-delta-phase2-production-wiring
 demand_id: DM-20260706-004
 priority: P1
-status: s1_proposal
+status: s7_archived
 domains: [D7]
 dsaft_scenarios:
   - D7-S5   # Observe node Phase 2 BuildObservePriorDelta 生产链路 wiring
@@ -35,5 +35,8 @@ notes: |
   Split from devrix-d7-frame-delta-phase1-2-span-trigger (DM-20260706-001)
   S3-Gate codex review (BLOCKED 2026-07-08). Phase 2 production wiring
   缺失是独立 production-side gap，需在 production code (非 testutil) 修复。
-  observation_proposer.go:257 硬编码 nil → 需 upstream item_observe.go
-  传 prevExecCtx → WorkItemExecContext atomic.Pointer 链路打通。
+  observation_proposer.go:257 硬编码 nil → upstream item_observe.go
+  +1 参数 prevExecCtx → ItemPipelineRunner.Run() 构造 WorkItemExecContext
+  {Item, Tasks} 链路打通。PR #467 squash merged 2026-07-08 (S4 完成)。
+  S7_Archived 2026-07-08 retroactive (ship-then-archive 模式 + 双 sibling
+  同期归档)。
