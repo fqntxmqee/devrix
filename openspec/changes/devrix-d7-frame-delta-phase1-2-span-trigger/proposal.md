@@ -20,6 +20,25 @@
 
 父 Change 的 acceptance-report §8.3 已显式记录此 gap 为 ⚠️ FOLLOW-UP,父 mups-frame-delta-spec.md §3 标注 "production code 已合规,e2e scenario 未触发 gates"。本 Change 即关闭该 gap。
 
+### 1.1 S3-Rewrite (2026-07-08) 实测 baseline 更新
+
+S3-Gate codex CLI review (BLOCKED 2026-07-08) 触发 S3-Rewrite。实测 master 分支 baseline (post-sibling hotfixes #443 + #444):
+
+| Span Op | 实测 baseline | 目标 (S3-Rewrite) |
+|---------|--------------|-------------------|
+| Phase 3 ConvergenceMetric | 2 | ≥ 5 |
+| Phase 1 PlanFrameDeltaInject | 2 (post #443 wiring) | ≥ 5 |
+| Phase 2 ObservePriorDeltaInject | 2 (e2e);0 (production) | ≥ 5 (e2e);sibling DM-20260706-004 处理 production |
+
+**Sibling hotfixes (DM-20260706-002 + 003, 2026-07-06 同日合并):**
+
+- `#443` (commit 8b720e39):workitem_executor.go +19 行 binder — Phase 1 production wiring
+- `#444` (commit 9c5fc866):Phase 1+2 emit sites end() wiring — span 真正 reach Jaeger
+
+**Phase 2 production wiring 缺失** (`observation_proposer.go:257` 硬编码 `nil` prevExecCtx) — 由 sibling change **DM-20260706-004** (`devrix-d7-frame-delta-phase2-production-wiring`) 独立 production-side 修复。
+
+本 change scope 收窄为 **testutil_only e2e scenario 扩展**:从实测 2 round cycles 扩展到 5 round cycles,Phase 1+2+3 span count 提升到 ≥ 5。
+
 **Why (gap 的影响):**
 
 1. **Spec/code 一致性的最后一道闸门:** spec 声称 FrameDelta 协议横跨 Observe→Plan→Execute 三节点,但 e2e 测试只覆盖了 Execute→Observe 回写一半。如果 Phase 1+2 注入链路在 e2e 场景下不触发,意味着 production code 的触发条件在真实运行链路中也没有被验证,只能依赖 unit 测试覆盖。
@@ -30,9 +49,9 @@
 
 ## 2. Problem Statement
 
-### 2.1 根因(已确诊)
+### 2.1 根因(已确诊 + S3-Rewrite 拆分)
 
-**Phase 1 `InjectPlanFrameDelta` 触发条件 = `plan.FrameDelta` 非零:**
+**Phase 1 `InjectPlanFrameDelta` 触发条件 = `plan.FrameDelta` 非零 + production wiring 已合规:**
 
 ```go
 // internal/layers/orchestration/sessionorchestrator/execute_plan_frame_inject.go
@@ -44,13 +63,15 @@ func InjectPlanFrameDelta(ctx, plan.FrameDelta, baseline string) string {
 }
 ```
 
-`SequenceLLMStub` 输出的 `StrategicPlanProposal` JSON 含 `execution_mode + child_specs + deliverable_contract`,但经过 Plan LLM 解码 + Frame Observe/Plan 字段填充后,在 Plan OutputProcessor 中 `plan.FrameDelta.IsZero()` 仍为 true (因为 production Frame Delta 5 字段 `PriorArtifactSummary / KnownGaps / ExecutionMode / ChildSpecs / DeliverableContract` 与 LLM 输出 schema 命名不同,需要显式映射)。
+**S3-Rewrite 重要修正:** Phase 1 production wiring 已由 sibling hotfix `#443` (DM-20260706-002, commit 8b720e39) 修复 — `workitem_executor.go` +19 行 binder 显式读取 `ec.PlanFrameDelta` 并调用 `InjectPlanFrameDelta`。原 change "production code 0 修改" 承诺在 Phase 1 维度已闭环。
+
+e2e scenario 仅 2 round cycles 导致 Phase 1 span count = 2 (而非 ≥ 5)。testutil `SequenceLLMStub` 输出 `StrategicPlanProposal` JSON 含 `execution_mode + child_specs + deliverable_contract`,经 Plan LLM 解码 + Frame Observe/Plan 字段填充后,在 Plan OutputProcessor 中 `plan.FrameDelta.IsZero()` 在 turn 1+3 (Plan LLM turn) 为 true,turn 2+4 (Execute turn) 触发 span。
 
 **Phase 2 `BuildObservePriorDelta` 触发条件 = `prevExecCtx != nil` (非首轮):**
 
 ```go
 // internal/layers/orchestration/sessionorchestrator/observe_frame_delta.go
-func BuildObservePriorDelta(prevExecCtx *WorkItemExecContext) FrameDelta {
+func BuildObservePriorDelta(ctx context.Context, sessionID string, prevExecCtx *WorkItemExecContext) interfaces.FrameDelta {
     if prevExecCtx == nil || prevExecCtx.ConvergenceMetric == nil {
         return FrameDelta{}  // 首轮零值,无 span emit
     }
@@ -58,7 +79,13 @@ func BuildObservePriorDelta(prevExecCtx *WorkItemExecContext) FrameDelta {
 }
 ```
 
-Round 1 (Observe 首轮) `prevExecCtx == nil` 返回零值,符合预期。Round 2-5 因 Phase 1 未触发注入,Phase 3 ConvergenceMetric 没有正常累积 prior-round 数据,导致 Phase 2 `BuildObservePriorDelta` 链路上的 FrameDelta 注入条件退化,即使 `prevExecCtx != nil` 也不发射 span。
+e2e scenario 实测 2 round cycles → Phase 2 span count = 2 (Round 2+ 触发,Round 1 prevExecCtx=nil 返回零值)。要提升到 ≥ 5 需 e2e scenario 扩展到 5 round cycles (本 change 处理)。
+
+**Phase 2 production wiring 缺失 (S3-Rewrite 拆分):**
+
+production 代码 `observation_proposer.go:257` 硬编码 `nil` prevExecCtx → `BuildObservePriorDelta` 在 production 永远走首轮零值分支 → production `D7_Observe_PriorDelta_Inject` span count 永远 0。
+
+**本 change 不处理 Phase 2 production wiring** (testutil_only scope 守住),由 sibling change **DM-20260706-004** (`devrix-d7-frame-delta-phase2-production-wiring`) 独立 production-side 修复。S3-Gate codex review P0-2 issue 拆分决定。
 
 ### 2.2 e2e 覆盖 gap
 

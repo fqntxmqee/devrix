@@ -17,36 +17,39 @@
 
 关闭 `devrix-d7-mups-frame-delta-closure` (DM-20260705-010) Phase 4 §8.3 follow-up gap:在 e2e 测试场景下,Phase 1 (`d7.s9.execute.plan_frame_delta.inject`) + Phase 2 (`d7.s5.observe.prior_delta.span`) span 在 `TestIntegration_D7FrameDelta_E2E_SpansAndMonotonicity` 的 memory exporter 中实际触发计数 ≥ 期望值。
 
-| 痛点（来自 Phase 4 §8.3 实证） | 本 Change 对应 AC |
-|-------------------------------|-------------------|
-| **Phase 1 span 不触发**:synthetic LLM stub 不触发 `StrategicPlanProposal.FrameDelta` 非零,导致 `InjectPlanFrameDelta` 早返回不发射 span | AC1 |
-| **Phase 2 span 不触发**:Round 1 `prevExecCtx == nil` 返回零值;Round 2-5 因 Phase 1 未触发,prior 数据累积空,链路退化 | AC2 |
-| **spec/code 一致性失衡**:Phase 3 (deterministic 0 LLM) 有 e2e 覆盖,Phase 1+2 只有 unit 覆盖,testutil_only 修复需 testutil callback 注入 | AC4 |
-| **测试金字塔缺一块**:frame-delta 协议 e2e tier 缺 Phase 1+2,后续 v1.1 TraceID / v2.0 跨域 FrameDelta 抽象上提前置条件不齐 | AC7 |
+| 痛点（来自 Phase 4 §8.3 实证） | 本 Change 对应 AC | S3-Rewrite 拆分后归属 |
+|-------------------------------|-------------------|------------------------|
+| **Phase 1 span 不触发**:synthetic LLM stub 不触发 `StrategicPlanProposal.FrameDelta` 非零,导致 `InjectPlanFrameDelta` 早返回不发射 span | AC1 | **本 change 处理 (e2e scenario 扩展 + callback)** |
+| **Phase 2 span 不触发**:Round 1 `prevExecCtx == nil` 返回零值;Round 2-5 因 Phase 1 未触发,prior 数据累积空,链路退化 | AC2 | **本 change 处理 (e2e scenario 扩展 + seed)** |
+| **Phase 2 production wiring 缺失**:`observation_proposer.go:257` 硬编码 `nil` | (S3-Rewrite 新增) | **sibling DM-20260706-004 处理 (production-side 修复)** |
+| **spec/code 一致性失衡**:Phase 3 (deterministic 0 LLM) 有 e2e 覆盖,Phase 1+2 只有 unit 覆盖,testutil_only 修复需 testutil callback 注入 | AC4 | **本 change 处理** |
+| **测试金字塔缺一块**:frame-delta 协议 e2e tier 缺 Phase 1+2,后续 v1.1 TraceID / v2.0 跨域 FrameDelta 抽象上提前置条件不齐 | AC8 (新) | **本 change 处理** |
 
-### 1.2 技术目标（量化指标）
+### 1.2 技术目标(S3-Rewrite 量化指标更新)
 
-| 指标 | 目标值 | 触发 AC |
-|------|-------|---------|
-| **Phase 1 span 触发数** | ≥ 5 (5 turns × 1 inject/turn) | AC1 |
-| **Phase 2 span 触发数** | ≥ 4 (Round 2-5 各 1 次;Round 1 通过 seed 满足) | AC2 |
-| **Phase 3 span 触发数** | ≥ 5 (无回归) | AC3 |
+| 指标 | 实测 baseline (post #443 + #444) | 目标 (S3-Rewrite) | 触发 AC |
+|------|--------------------------------|-------------------|---------|
+| **Phase 1 span 触发数** | 2 (e2e scenario 仅 2 round cycles) | ≥ 5 (e2e scenario 扩展到 5 round cycles) | AC1 |
+| **Phase 2 span 触发数** | 2 (e2e);0 (production) | ≥ 5 (e2e);production 由 sibling DM-20260706-004 修复 | AC2 |
+| **Phase 3 span 触发数** | 2 (e2e scenario 仅 2 round cycles) | ≥ 5 (e2e scenario 同步扩展) | AC3 |
 | **stub vs production 差异文档化** | design.md §5 + testutil 注释明确 "testutil only, NOT production" | AC4 |
-| **71 frame 测试 + 16 D7-FD unit 测试** | 100% PASS,0 行为变化 | AC5 |
-| **跨链 prompt size 单调性** | last ≤ first*3 (e2e scenario 真实触发链路后仍满足) | AC6 |
-| **L5-MUPS-FD-6 T-IDs 登记** | `openspec/specs/d7-orchestration/t-registry.md` D7-FD 段 | AC7 |
+| **sibling DM-20260706-004 兼容性** | testutil seed helper 在 production wiring 后仍 work | AC5 (S3-Rewrite 新增) |
+| **71 frame 测试 + 16 D7-FD unit 测试** | 100% PASS,0 行为变化 | AC6 |
+| **跨链 prompt size 单调性** | last ≤ first*3 (e2e scenario 扩展后仍满足) | AC7 |
+| **L5-MUPS-FD-6 T-IDs 登记** | `openspec/specs/d7-orchestration/t-registry.md` D7-FD 段 | AC8 (新) |
 | **testutil_only 代码增量** | ≤ 100 行 (含 3 sub-test) | scope |
-| **production code 增量** | 0 行 | scope |
+| **production code 增量** | 0 行 (testutil_only scope 守住) | scope |
 
-### 1.3 约束条件
+### 1.3 约束条件(S3-Rewrite)
 
-- **testutil_only scope** — `internal/layers/orchestration/sessionorchestrator/{convergence_metric,observe_frame_delta,execute_plan_frame_inject}.go` 0 修改;`internal/layers/orchestration/hardening/emitter.go` 0 修改
+- **testutil_only scope** — `internal/layers/orchestration/sessionorchestrator/{convergence_metric,observe_frame_delta,execute_plan_frame_inject}.go` 0 修改;`internal/layers/orchestration/hardening/emitter.go` 0 修改;**`observation_proposer.go` + `item_observe.go` 0 修改 (Phase 2 production wiring 由 sibling DM-20260706-004 处理)**
 - **append-only 注入原则不变** — production FrameDelta 5 字段 `PriorArtifactSummary + KnownGaps + ExecutionMode + ChildSpecs + DeliverableContract` 0 修改
 - **0 LLM 承诺不变** — `SequenceLLMStub.FrameDeltaInject` callback 不调真 LLM,只 hook 输出 JSON 注入
 - **M1 ObservationFrame 9 字段 / M2 StrategicPlanFrame 16 字段契约** 0 修改 (DM-20260705-003)
 - **DM-20260705-008 Strategy 抽象** — 不冲突 (testutil_only scope 不进决策表)
 - **DM-20260704-006 ResolutionContract** — 不冲突 (testutil seed 不进 ResolutionClaim)
 - **三层 fail-safe / Pessimistic Commit L3** — 不破坏 (testutil seed 在 setup/teardown 显式 reset)
+- **sibling DM-20260706-004 协调** — 本 change AC5 显式验证 testutil `SeedPriorExecContext` 与 production wiring 兼容
 
 ---
 
@@ -240,24 +243,26 @@ tests/integration/d7/
     └─→ prompt size monotonicity: last ≤ first*3              → AC6 PASS
 ```
 
-### 5.2 stub vs running system 差异分析
+### 5.2 stub vs running system 差异分析(S3-Rewrite)
 
 | 维度 | stub (testutil SequenceLLMStub + FrameDeltaInject) | running system (production) |
 |------|---------------------------------------------------|----------------------------|
 | **LLM 输出 schema** | callback 返回 `FrameDelta` 5 字段纯值对象 | Plan LLM 输出 JSON,经 Plan OutputProcessor 解析填充 `plan.FrameDelta` |
-| **FrameDelta 注入路径** | testutil 直接在 stub 内存中包装 JSON response | production 走 `Strategy.FrameDelta` 字段 → `InjectPlanFrameDelta(ctx, plan.FrameDelta, baseline)` |
-| **prior data 累积** | `SeedPriorExecContext` 显式 seed | production 走 `WorkItemExecContext` atomic.Pointer 自然累积 (Round N+1 读 Round N) |
-| **span 触发条件** | `plan.FrameDelta.IsZero() == false` 由 callback 保证 | production 由 Plan LLM 输出决定 (与 stub 一致) |
+| **FrameDelta 注入路径 (Phase 1)** | testutil 直接在 stub 内存中包装 JSON response | production 走 `workitem_executor.go` binder (#443 已 wired) → `InjectPlanFrameDelta(ctx, plan.FrameDelta, baseline)` |
+| **prior data 累积 (Phase 2)** | `SeedPriorExecContext` 显式 seed `Item.LastRound.ArtifactSummary` | production 走 `WorkItemExecContext` atomic.Pointer 自然累积 (Round N+1 读 Round N);**`observation_proposer.go:257` hardcoded nil 由 sibling DM-20260706-004 修复** |
+| **span 触发条件** | `plan.FrameDelta.IsZero() == false` 由 callback 保证 | production 由 Plan LLM 输出决定 (与 stub 一致);Phase 1 production 已 wired via #443 |
 | **0 LLM 承诺** | callback 不调真 LLM | production `ComputeConvergenceMetric` 0 LLM |
-| **0 production code 修改** | testutil_only scope | production 已合规 |
+| **0 production code 修改** | testutil_only scope | production 已合规 (#443 Phase 1 + Phase 2 emit end() #444);**Phase 2 wiring 由 sibling DM-20260706-004 处理** |
 
 **stub → running system 适配路径:**
 
-1. **Phase 1**: stub callback 返回 `FrameDelta{ExecutionMode: "protocol", ...}` 对应 production Plan LLM 输出 `{"execution_mode":"protocol","deliverable_contract":"summary"}` 的语义。running system 通过 Plan OutputProcessor 解析填充 `plan.FrameDelta`,与 stub callback 语义一致。
-2. **Phase 2**: stub `SeedPriorExecContext(workItemID, priorRound)` 对应 production Round 1 的 `prevExecCtx = nil`(真实 running system Round 1 不会有 prior,因为还没跑过)。本 change 仅在 testutil 场景下 seed,production Round 1 span count = 0 是**预期行为** (Round 1 零值返回不破坏协议,Round 2-5 才触发)。
+1. **Phase 1**: stub callback 返回 `FrameDelta{ExecutionMode: "protocol", ...}` 对应 production Plan LLM 输出 `{"execution_mode":"protocol","deliverable_contract":"summary"}` 的语义。running system 通过 Plan OutputProcessor 解析填充 `plan.FrameDelta`,经 `workitem_executor.go` binder (#443) 触发 `InjectPlanFrameDelta`,与 stub callback 语义一致。
+2. **Phase 2**: stub `SeedPriorExecContext(workItemID, priorRound)` 显式 seed `Item.LastRound.ArtifactSummary` 对应 production Round 1 的 `prevExecCtx = nil`(真实 running system Round 1 不会有 prior,因为还没跑过)。production Round 2-5 走 `WorkItemExecContext` atomic.Pointer 自然累积,但需 sibling DM-20260706-004 修复 `observation_proposer.go:257` 硬编码 nil 后才能触达 `BuildObservePriorDelta`。
 3. **Phase 3**: stub 0 LLM 与 production 0 LLM 一致。
 
-**AC4 文档化要求:** 本 Change S5 验收时,acceptance-report §5 必须含此 stub vs running system 差异分析段。
+**AC4 文档化要求 (S3-Rewrite):** 本 Change S5 验收时,acceptance-report §5 必须含此 stub vs running system 差异分析段,**并显式 cross-reference sibling DM-20260706-004 的 production wiring 修复 (AC5 联动)**。
+
+**S3-Rewrite 重要修正:** 原 design.md §5.2 "production 已合规" 表述已过时。Phase 1 production 由 #443 + #444 闭环,Phase 2 production 仍需 sibling DM-20260706-004 修复 (硬编码 nil)。本 change 不混入 Phase 2 production wiring (testutil_only scope 守住)。
 
 ### 5.3 单点风险与缓解
 
@@ -273,7 +278,7 @@ tests/integration/d7/
 
 ## ⑥ 接口 / API 设计
 
-### 6.1 风格 — Pure types + 不可变值对象 + testutil callback
+### 6.1 风格 — Pure types + 不可变值对象 + testutil callback (S3-Rewrite 字段对齐)
 
 **testutil helper 风格:** factory function + With* 模式 + callback 字段
 
@@ -303,18 +308,35 @@ type SequenceLLMStub struct {
 // with a prior round state so that Round 1's BuildObservePriorDelta
 // returns non-zero and emits d7.s5.observe.prior_delta.span. **TESTUTIL ONLY**.
 //
+// S3-Rewrite 字段对齐:seed 目标 = `prevExecCtx.Item.LastRound.ArtifactSummary`,
+// 非 `prevExecCtx.ConvergenceMetric`。理由:`observe_frame_delta.go:46-52` 的
+// `BuildObservePriorDelta` 非零条件依赖 `Item.LastRound.ArtifactSummary` 非空,
+// `ConvergenceMetric` 是中间累积态 (Round N 末轮才产生),直接 seed 不会被 BuildObservePriorDelta
+// 当作非零条件命中。
+//
 // production-equivalent: production Round 1 prevExecCtx=nil by design (no
 // prior round yet); Round 2-5 prevExecCtx accumulates naturally via
 // WorkItemExecContext atomic.Pointer in ItemPipelineRunner.
+// Sibling DM-20260706-004 修复 observation_proposer.go:257 hardcoded nil
+// 后,production 链路打通,本 helper 仍兼容 (testutil mock state 与 production wiring 独立)。
 //
 // Callers MUST reset via t.Cleanup to avoid leaking state to other tests.
 func SeedPriorExecContext(t *testing.T, stack *D7TestStack, workItemID string, priorRound orchestration.ConvergenceMetric) {
     t.Helper()
-    // 1. Locate WorkItemExecContext via WorkItemExecContextRegistry
-    // 2. atomic.Pointer.Store(&WorkItemExecContext{...})
-    // 3. t.Cleanup(func() { registry.Store(nil) })
+    // S3-Rewrite 伪代码 (与 codex review P0-3 一致):
+    // 1. Locate WorkItem via test stack: stack.TaskManager.FindByID(workItemID)
+    // 2. Build WorkItemExecContext{Item: wi, Item.LastRound.ArtifactSummary: priorRound.LastArtifactSummary, ConvergenceMetric: &priorRound}
+    // 3. atomic.Pointer.Store(&execCtx)
+    // 4. t.Cleanup(func() { atomic.Pointer.Store(nil) })
 }
 ```
+
+**S3-Rewrite 字段对齐 rationale:**
+
+- `BuildObservePriorDelta` (observe_frame_delta.go:46-52) 非零条件:`prevExecCtx.Item.LastRound.ArtifactSummary` 非空
+- `ConvergenceMetric` 是 Round N 末轮 EmitConvergence 累积态,Round 1 无 prior 时 `prevExecCtx == nil`
+- 原 design.md §6.1 "seed ConvergenceMetric" 是 codex P0-3 指出的字段错位,修正为 "seed `Item.LastRound.ArtifactSummary`"
+- WorkItem locate: 通过 `stack.TaskManager.FindByID(workItemID)` 在 test stack 内部查 (testutil 已持有 `*workmodel.TaskManager`)
 
 ### 6.2 契约 (Span + Trace + 错误码)
 
@@ -322,9 +344,10 @@ func SeedPriorExecContext(t *testing.T, stack *D7TestStack, workItemID string, p
 |------|------|------|
 | **Span Op 触发** | 沿用父 change 已注册的 3 span op,attribute 6 个全可见 | memory exporter inspection |
 | **callback 返回类型** | `func(idx int) orchestration.FrameDelta` (5 字段纯值对象) | static type check |
-| **Seed 函数输入** | `(t *testing.T, stack *D7TestStack, workItemID string, priorRound orchestration.ConvergenceMetric)` | unit test |
+| **Seed 函数输入 (S3-Rewrite)** | `(t *testing.T, stack *D7TestStack, workItemID string, priorRound orchestration.ConvergenceMetric)` (priorRound 内部展开为 `Item.LastRound.ArtifactSummary`) | unit test |
 | **错误码** | testutil silent 行为,0 panic / 0 business log;错误由 test framework 报 (t.Fatalf) | test framework |
 | **TraceID 透传** | 不涉及 (FrameDelta v1.0 0 TraceID,父 change §6.4 v1.1 引入) | scope |
+| **sibling DM-20260706-004 兼容** | testutil `SeedPriorExecContext` 在 production wiring 后仍 work (testutil mock state 与 production wiring 独立) | sibling S5 联动验证 |
 
 ### 6.3 幂等保障表
 

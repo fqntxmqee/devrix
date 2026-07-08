@@ -1,0 +1,39 @@
+change_id: devrix-d7-frame-delta-phase2-production-wiring
+demand_id: DM-20260706-004
+priority: P1
+status: s1_proposal
+domains: [D7]
+dsaft_scenarios:
+  - D7-S5   # Observe node Phase 2 BuildObservePriorDelta 生产链路 wiring
+dsaft_activities:
+  - D7-S5-A111-L5-MUPS-FD-7   # Phase 2 production wiring: observation_proposer.go:257 nil → prevExecCtx 上游传参 (新登记)
+t_points:
+  - L5-MUPS-FD-7   # Phase 2 production wiring e2e span 触发链路 (新登记)
+created: 2026-07-08
+author: devrix-d7-frame-delta-phase1-2-span-trigger S3-Gate codex review (BLOCKED → split)
+title: "D7 Phase 2 frame_delta production wiring — observation_proposer.go:257 硬编码 nil → prevExecCtx 上游传参"
+parent_change: devrix-d7-mups-frame-delta-closure
+parent_demand: DM-20260705-010
+parent_archive: openspec/archive/2026-07-05-devrix-d7-mups-frame-delta-closure/
+related_changes:
+  - devrix-d7-frame-delta-phase1-2-span-trigger  # DM-20260706-001 — sibling testutil_only change
+parent_specs:
+  - openspec/specs/d7-orchestration/spec.md
+  - openspec/specs/d7-orchestration/mups-frame-delta-spec.md
+  - openspec/specs/d7-orchestration/t-registry.md
+parent_demands:
+  - DM-20260705-010  # frame-delta-closure parent
+  - DM-20260706-001  # sibling testutil_only change
+scope:
+  production_code: true   # 修改 production code (与 sibling testutil_only 不同)
+  testutil_change: false  # 0 testutil 修改
+  llm_calls_added: 0      # 0 新 LLM 调用 (deterministic wiring)
+follow_up_gaps:
+  - T19 S3-Gate 三方 review (codex + cursor + claude) — sibling DM-20260706-001 review 进行中
+  - running system 真实飞书 session Jaeger trace 重放 — out of scope,需 user action
+notes: |
+  Split from devrix-d7-frame-delta-phase1-2-span-trigger (DM-20260706-001)
+  S3-Gate codex review (BLOCKED 2026-07-08). Phase 2 production wiring
+  缺失是独立 production-side gap，需在 production code (非 testutil) 修复。
+  observation_proposer.go:257 硬编码 nil → 需 upstream item_observe.go
+  传 prevExecCtx → WorkItemExecContext atomic.Pointer 链路打通。
