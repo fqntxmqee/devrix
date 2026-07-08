@@ -108,6 +108,14 @@ func (o *SessionOrchestrator) RunSessionTurnLoop(
 		// focus / skip path).
 		var lastArtifactSummary string
 		var lastRound *workmodel.WorkItemPipelineRound
+		// DM-20260708-002: track the source of the terminal complete event's
+		// content so buildSessionCompleteEvent can suppress the
+		// task_incomplete override when the answer came from the
+		// observational_answer fast-path. Without this, "2×3=6" (4 runes)
+		// would be classified as SummaryQualityTooShort by both summary and
+		// final gates, and isBothSummaryAndFinalBad would replace the
+		// correct answer with taskIncompleteUserMessage.
+		var lastCompleteSource string
 
 		turnNo := 0
 		if o.turnState != nil {
@@ -245,6 +253,11 @@ func (o *SessionOrchestrator) RunSessionTurnLoop(
 				}
 				if content != "" {
 					lastArtifactSummary = content
+					if round.ExitReason == "observational_answer" {
+						lastCompleteSource = completeEventSourceObservationalAnswerFastPath
+					} else {
+						lastCompleteSource = ""
+					}
 					emit(ctx, o.sink, out, &contracts.EngineEvent{
 						Type:      "text",
 						Content:   content,
@@ -338,7 +351,7 @@ func (o *SessionOrchestrator) RunSessionTurnLoop(
 	sessionLoopDone:
 
 		// Prefer rollup deliverable + quality gate (DM-20260630-012).
-		emit(ctx, o.sink, out, buildSessionCompleteEvent(ctx, sessionID, o.taskManager, lastArtifactSummary))
+		emit(ctx, o.sink, out, buildSessionCompleteEvent(ctx, sessionID, o.taskManager, lastArtifactSummary, lastCompleteSource))
 	}()
 
 	return out, nil

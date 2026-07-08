@@ -11,14 +11,31 @@ import (
 // taskIncompleteUserMessage matches D1 conclusion.TaskIncompleteMessage (DM-20260630-011).
 const taskIncompleteUserMessage = "（任务未能完成，AI 未产生有效结论。请重新发起。）"
 
+// completeEventSourceObservationalAnswerFastPath marks the terminal complete
+// event as derived from the DM-20260706-011 fast-path. The source disables
+// the task_incomplete override: a short CatBusiness ObsFact answer (e.g.
+// "2×3=6", "巴黎是法国首都") is structurally trustworthy even though it
+// falls under the 100-rune too_short threshold. Without this, a correct
+// fast-path answer would be replaced by taskIncompleteUserMessage and the
+// user would see "❌ 任务未完成" right after the right answer.
+const completeEventSourceObservationalAnswerFastPath = "observational_answer_fastpath"
+
 // buildSessionCompleteEvent assembles the terminal complete EngineEvent for
-// RunSessionTurnLoop (DM-20260630-012): rollup deliverable first, quality gate,
+// RunSessionTurnLoop (DM-20260730-012): rollup deliverable first, quality gate,
 // TaskIncomplete when both summary and content classify as bad.
+//
+// `source` records the originator of the terminal content (e.g.
+// `observational_answer_fastpath`). When the source is the fast-path, the
+// task_incomplete override is suppressed because the answer is structurally
+// pre-validated by pickHighStrengthBusinessFact (strength ≥ 0.9, CatBusiness
+// ObsFact, no ObsUncertainty) and persisted with VerdictPass — overriding
+// it would mask a correct answer as a failure.
 func buildSessionCompleteEvent(
 	ctx context.Context,
 	sessionID string,
 	tm *workmodel.TaskManager,
 	lastArtifactSummary string,
+	source string,
 ) *contracts.EngineEvent {
 	deliverable := strings.TrimSpace(workmodel.ExtractSessionDeliverable(tm, sessionID))
 	content := deliverable
@@ -37,14 +54,20 @@ func buildSessionCompleteEvent(
 		"summary_quality":  string(summaryQuality.Kind),
 		"final_quality":    string(finalQuality.Kind),
 		"event_type":       "complete",
+		"source":           source,
 	}
 	if summaryQuality.Kind == SummaryQualityTooShort || summaryQuality.Kind == SummaryQualityInconclusive {
 		meta["summary"] = summary
 	}
-	if isBothSummaryAndFinalBad(summaryQuality.Kind, finalQuality.Kind) {
+	switch {
+	case isBothSummaryAndFinalBad(summaryQuality.Kind, finalQuality.Kind) && source != completeEventSourceObservationalAnswerFastPath:
+		// Both summary and final classify as too_short/inconclusive AND the
+		// content did NOT come from the fast-path. The fast-path bypasses
+		// this because its short CatBusiness ObsFact answer is structurally
+		// pre-validated (see package doc for pickHighStrengthBusinessFact).
 		content = taskIncompleteUserMessage
 		meta["task_incomplete"] = "true"
-	} else if hasOpenIncompleteDeliverable(tm, sessionID) {
+	case hasOpenIncompleteDeliverable(tm, sessionID):
 		meta["task_incomplete"] = "true"
 	}
 	return &contracts.EngineEvent{

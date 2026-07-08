@@ -28,7 +28,7 @@ func TestBuildSessionCompleteEvent_should_prefer_rollup_deliverable(t *testing.T
 		VerdictKind:     types.VerdictPass,
 	}, workmodel.RoundPhaseIdle)
 
-	ev := buildSessionCompleteEvent(context.Background(), sessionID, tm, "Let me continue exploring...")
+	ev := buildSessionCompleteEvent(context.Background(), sessionID, tm, "Let me continue exploring...", "")
 	if ev == nil {
 		t.Fatal("nil event")
 	}
@@ -51,7 +51,7 @@ func TestBuildSessionCompleteEvent_should_emit_task_incomplete_when_both_bad(t *
 		ArtifactSummary: "Let me continue exploring.",
 	}, workmodel.RoundPhaseIdle)
 
-	ev := buildSessionCompleteEvent(context.Background(), sessionID, tm, "Let me continue exploring.")
+	ev := buildSessionCompleteEvent(context.Background(), sessionID, tm, "Let me continue exploring.", "")
 	if ev.Content != taskIncompleteUserMessage {
 		t.Fatalf("content = %q, want task incomplete message", ev.Content)
 	}
@@ -72,9 +72,72 @@ func TestBuildSessionCompleteEvent_should_emit_task_incomplete_when_open_incompl
 		ArtifactSummary:   "P0: issue in internal/foo.go:1",
 	}, workmodel.RoundPhaseIdle)
 
-	ev := buildSessionCompleteEvent(context.Background(), sessionID, tm, "P0: issue in internal/foo.go:1")
+	ev := buildSessionCompleteEvent(context.Background(), sessionID, tm, "P0: issue in internal/foo.go:1", "")
 	if ev.Metadata["task_incomplete"] != "true" {
 		t.Fatalf("expected task_incomplete when open WI owes deliverable, meta=%v", ev.Metadata)
+	}
+}
+
+// DM-20260708-002 (devrix hotfix for "2×3=6" → "❌ 任务未完成" screenshot):
+// the observational_answer fast-path produces a short CatBusiness ObsFact
+// answer (e.g. "2×3=6", "巴黎是法国首都") that legitimately falls under
+// the 100-rune too_short threshold. buildSessionCompleteEvent must NOT
+// replace it with taskIncompleteUserMessage — the answer is structurally
+// pre-validated by pickHighStrengthBusinessFact (strength ≥ 0.9, no
+// ObsUncertainty) and the round carries VerdictPass. The fast-path
+// caller passes `source = observational_answer_fastpath` to signal this
+// so the quality-gate override is suppressed.
+//
+// Regression guard: removing the source bypass (or removing the
+// `source != completeEventSourceObservationalAnswerFastPath` clause
+// in buildSessionCompleteEvent) makes this test fail.
+func TestBuildSessionCompleteEvent_preserves_fastpath_short_answer(t *testing.T) {
+	tm := workmodel.NewTaskManager()
+	sessionID := "sess-fastpath-short"
+	_, _ = tm.EnsureGoal(sessionID, "2x3=几?")
+
+	// "2×3=6" is 4 runes — well under the 100-rune too_short threshold.
+	const fastPathAnswer = "2×3=6"
+	ev := buildSessionCompleteEvent(context.Background(), sessionID, tm, fastPathAnswer, completeEventSourceObservationalAnswerFastPath)
+	if ev == nil {
+		t.Fatal("nil event")
+	}
+	if ev.Content != fastPathAnswer {
+		t.Fatalf("content = %q, want %q (fast-path answer must not be replaced by taskIncompleteUserMessage)",
+			ev.Content, fastPathAnswer)
+	}
+	if ev.Metadata["task_incomplete"] == "true" {
+		t.Fatalf("task_incomplete must be false for fast-path source; meta=%v", ev.Metadata)
+	}
+	// Quality meta is still recorded for observability (Jaeger / dashboards).
+	if ev.Metadata["summary_quality"] != string(SummaryQualityTooShort) {
+		t.Errorf("summary_quality = %q, want %q (gate still runs, just doesn't override)",
+			ev.Metadata["summary_quality"], SummaryQualityTooShort)
+	}
+	if ev.Metadata["final_quality"] != string(SummaryQualityTooShort) {
+		t.Errorf("final_quality = %q, want %q", ev.Metadata["final_quality"], SummaryQualityTooShort)
+	}
+	if ev.Metadata["source"] != completeEventSourceObservationalAnswerFastPath {
+		t.Errorf("source meta = %q, want %q", ev.Metadata["source"], completeEventSourceObservationalAnswerFastPath)
+	}
+}
+
+// DM-20260708-002: same content, but source="" — must still trigger
+// task_incomplete (the gate's override is per-source, not per-content).
+// This pins the asymmetric behavior: the fast-path bypass is opt-in
+// via source, not implicit.
+func TestBuildSessionCompleteEvent_task_incomplete_still_triggers_when_source_unknown(t *testing.T) {
+	tm := workmodel.NewTaskManager()
+	sessionID := "sess-short-unknown-source"
+	_, _ = tm.EnsureGoal(sessionID, "2x3=几?")
+
+	ev := buildSessionCompleteEvent(context.Background(), sessionID, tm, "2×3=6", "")
+	if ev.Content != taskIncompleteUserMessage {
+		t.Fatalf("content = %q, want %q (unknown source must not bypass task_incomplete override)",
+			ev.Content, taskIncompleteUserMessage)
+	}
+	if ev.Metadata["task_incomplete"] != "true" {
+		t.Fatal("expected task_incomplete meta when source is empty")
 	}
 }
 
