@@ -1,0 +1,37 @@
+change_id: devrix-d7-plan-llm-protocol-doc
+demand_id: DM-20260708-004
+title: D7 Plan↔LLM 5 场景输入输出协议沉淀
+priority: P1
+status: s2_proposal
+domains: [D7]
+dsaft_scenarios:
+  - D7-S6   # Plan Node (StrategicPlan LLM proposer + DefaultPlanner deterministic 4 PlanKind routing)
+dsaft_activities:
+  - D7-S6-A121   # Plan↔LLM 5 场景 I/O 协议 spec + 5 trace test
+t_points:
+  - D7-S6-A121-T01
+  - D7-S6-A121-T02
+  - D7-S6-A121-T03
+  - D7-S6-A121-T04
+  - D7-S6-A121-T05
+  - D7-S6-A121-T06
+  - D7-S6-A121-T07
+  - D7-S6-A121-T08
+  - D7-S6-A121-T09
+  - D7-S6-A121-T10
+  - D7-S6-A121-T11
+  - D7-S6-A121-T12
+pr: "new PR (沿用 PR #473 同模板; 独立提交)"
+supersedes: []
+parent_change: devrix-d7-observe-llm-protocol-doc
+parent_demand: DM-20260708-003
+version_scope:
+  d7-orchestration: "v4.29.0 → v4.30.0 (Plan 节点 spec 沉淀 follow-up)"
+notes: |
+  本 Change 是 devrix-d7-observe-llm-protocol-doc 的兄弟 spec, 沿用同模板。
+  Plan 节点与 Observe 节点的关键差异:
+  1. 走 prompttags 反射 (pt struct tag) + buildStrategicPlanFrame 显式条件, **无 N→M 显式过滤**
+  2. 输出是单对象 rawStrategicPlan, 非数组
+  3. LLM 决定 execution_mode (3 选 1), Go 端 MatchKind 决定 PlanKind (4 选 1)
+  4. 混合场景: single + 高 UncertaintyMean + hasHighStrengthFact → applySingleModeUncertaintyGate bypass
+  5. Plan 节点零 trace-level e2e bannered test (对比 observe 16 个), 5 test 补足
