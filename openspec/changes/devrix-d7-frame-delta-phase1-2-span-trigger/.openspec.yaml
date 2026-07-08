@@ -1,24 +1,27 @@
 change_id: devrix-d7-frame-delta-phase1-2-span-trigger
 priority: P1
 demand_id: DM-20260706-001
-status: s3_design
+status: s3_rewriting
 domains: [D7]
 dsaft_scenarios:
-  - D7-S5   # Observe 节点 prior_delta span 真实触发
-  - D7-S9   # Execute 节点 plan_frame_delta.inject span 真实触发
+  - D7-S5   # Observe 节点 prior_delta span 真实触发 (testutil seed 路径)
+  - D7-S9   # Execute 节点 plan_frame_delta inject span 真实触发 (testutil callback 路径)
 dsaft_activities:
   - D7-S9-A112-L5-MUPS-FD-6   # e2e Phase 1+2 span 触发链路 (新登记)
   - D7-S5-A111-L5-MUPS-FD-6   # e2e Phase 2 prior_delta span 触发链路 (新登记)
 t_points:
   - L5-MUPS-FD-6   # e2e Phase 1+2 span 触发链路 (新登记)
 created: 2026-07-06
-author: devrix-d7-frame-delta-phase1-2-span-trigger proposal
-title: "D7 MUPS Frame Delta Phase 1+2 spans 端到端触发 — 真实路径或 mock 注入覆盖 e2e gap"
+author: devrix-d7-frame-delta-phase1-2-span-trigger proposal (S3-Rewrite 2026-07-08)
+title: "D7 MUPS Frame Delta Phase 1+2 spans 端到端触发 — testutil callback + seed helper 覆盖 e2e gap (scope 收窄)"
 parent_change: devrix-d7-mups-frame-delta-closure
 parent_demand: DM-20260705-010
 parent_archive: openspec/archive/2026-07-05-devrix-d7-mups-frame-delta-closure/
 related_changes:
   - devrix-d7-mups-frame-delta-closure  # DM-20260705-010 — parent (Phase 4 §8.3 文档化此 gap)
+  - devrix-d7-frame-delta-phase2-production-wiring  # DM-20260706-004 — sibling (Phase 2 production wiring,拆分自本 change S3-Gate codex review)
+  - DM-20260706-002 PR #443  # sibling hotfix (Phase 1 production wiring)
+  - DM-20260706-003 PR #444  # sibling hotfix (Phase 1+2 emit end() wiring)
 parent_specs:
   - openspec/specs/d7-orchestration/spec.md
   - openspec/specs/d7-orchestration/mups-frame-delta-spec.md
@@ -26,10 +29,20 @@ parent_specs:
   - openspec/specs/d7-orchestration/CHANGELOG.md
 parent_demands:
   - DM-20260705-010  # frame-delta-closure parent
+  - DM-20260706-002  # Phase 1 production wiring (PR #443)
+  - DM-20260706-003  # Phase 1+2 emit end() wiring (PR #444)
+  - DM-20260706-004  # Phase 2 production wiring (sibling change,拆分自本 change)
 scope:
   testutil_only: true   # 仅修改 testutil + integration test,production code 0 修改
   append_only: true     # append-only 注入原则不变
   zero_llm: true        # Phase 2/3 deterministic 0 LLM 承诺不变
 follow_up_gaps:
-  - T19 S3-Gate 三方 review (codex + cursor + claude) — 单独 OpenSpec entry
+  - T19 S3-Gate 三方 review (codex + cursor + claude) — S3-Rewrite 后重提,codex CLI 已就位,cursor quota 待恢复
+  - DM-20260706-004 sibling change (Phase 2 production wiring) — 独立 production-side 修复
   - running system 真实飞书 session 验证 — out of scope,需 user action
+notes: |
+  S3-Gate codex review (BLOCKED 2026-07-08) 拆分 Phase 2 production
+  wiring gap 至独立 change DM-20260706-004 (sibling production-side 修复)。
+  原 change scope 收窄:testutil_only + e2e baseline 提升 (Phase 1+2 span
+  count 从实测 baseline 2 提升到 ≥ 5)。sibling DM-20260706-002 + 003
+  hotfixes 已 wired Phase 1+2 emission paths (commit 8b720e39 + 9c5fc866)。
