@@ -393,3 +393,53 @@ func TestObservationalAnswerFastPath_LearnerSourceIDIncludesObsID(t *testing.T) 
 	// reachable through the rep store row.
 	_ = learn.NewAssetBuilder() // silence unused-import linter when test run on minimal build tags
 }
+
+// DM-20260706-011 hotfix (devrix sess_1783490448133_5000): the
+// observational_answer fast-path produced a round with empty SpawnPolicy,
+// VerdictPass, and item.Status still InProgress. session_turn_loop's three
+// exit gates (HasOpenWork / sessionNoForwardProgress / evaluateSessionLoop
+// ExitAfterRound) all failed to converge → the loop re-ran Run() on every
+// iteration, emitting the same text event thousands of times.
+//
+// Fix: maybeObservationalAnswer now transitions the item to
+// TaskStatusCompleted via Tree().UpdateStatus. This test pins the contract:
+//
+//   - After Run() returns the fast-path round, item.Status == Completed.
+//   - HasOpenWork returns false (session loop will exit cleanly).
+//   - Item is Locked (reputation is recorded; no future mutations).
+//
+// Regression guard: removing the UpdateStatus call makes this test fail.
+func TestObservationalAnswerFastPath_TerminatesItemToBreakLoop(t *testing.T) {
+	runner, tm, _ := newItemPipelineTestRunner(t)
+	exec := &gateCountingExecutor{}
+	runner.Executor = exec
+	runner.ObservationProposer = observeProposerFromReport(buildFastPathReport(t,
+		fastPathObsFact("obs_fact_terminal", "6 (六).", 0.99),
+	))
+
+	goal, err := tm.EnsureGoal("sess_fastpath_terminal", "2x3=?")
+	if err != nil {
+		t.Fatalf("EnsureGoal: %v", err)
+	}
+
+	if _, err := runner.Run(context.Background(), "sess_fastpath_terminal", goal, "u1", ItemPipelineRunOpts{}); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	got, ok := tm.GetWorkItem("sess_fastpath_terminal", goal.ID)
+	if !ok {
+		t.Fatalf("work item not found after Run")
+	}
+	if got.Status != workmodel.TaskStatusCompleted {
+		t.Fatalf("item.Status = %s, want TaskStatusCompleted (hotfix for sess_1783490448133_5000 infinite loop)", got.Status)
+	}
+	if !got.Locked {
+		t.Fatal("item.Locked = false, want true (UpdateStatus locks on terminal transition)")
+	}
+	if tm.Tree().HasOpenWork("sess_fastpath_terminal") {
+		t.Fatal("HasOpenWork = true after fast-path, want false (would cause session_turn_loop infinite iteration)")
+	}
+	if exec.callCount() != 0 {
+		t.Fatalf("Execute ran %d times; fast-path must NOT invoke Execute", exec.callCount())
+	}
+}

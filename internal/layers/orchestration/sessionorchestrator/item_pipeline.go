@@ -1346,6 +1346,38 @@ func (r *ItemPipelineRunner) maybeObservationalAnswer(
 		return nil, fmt.Errorf("item_pipeline: observational_answer ApplyPipelineRound: %w", err)
 	}
 
+	// DM-20260706-011 hotfix (devrix session_1783490448133_5000): transition
+	// the item to TaskStatusCompleted so the session turn loop's three exit
+	// gates (HasOpenWork / sessionNoForwardProgress / evaluateSessionLoopExit
+	// AfterRound) all converge to "exit" instead of iterating forever. The
+	// observational_answer fast-path produces a VerdictPass round with empty
+	// SpawnPolicy — without this transition, item.Status stays InProgress,
+	// HasOpenWork keeps returning true, sessionNoForwardProgress's
+	// `default:` branch returns false on empty SpawnPolicy, and the loop
+	// re-enters Run() emitting the same text/pipeline_round pair on every
+	// iteration (observed: 9371 outbound OnMessage calls in ~3 minutes for a
+	// single "2×3=几" message).
+	//
+	// UpdateStatus also locks the item (Locked=true) which prevents future
+	// turns from mutating it — correct semantics: the deterministic Q&A
+	// answer is final and reputation has been recorded.
+	//
+	// The status machine only allows Pending→InProgress→Completed, so we
+	// step Pending items through InProgress first. Failure here is
+	// non-fatal: the loop will iterate one extra time before exiting.
+	if item.Status != workmodel.TaskStatusCompleted {
+		if item.Status == workmodel.TaskStatusPending {
+			if err := r.Tasks.Tree().UpdateStatus(sessionID, item.ID, workmodel.TaskStatusInProgress); err != nil {
+				slog.Warn("item_pipeline: observational_answer UpdateStatus(Pending→InProgress) failed (non-fatal)",
+					"session_id", sessionID, "work_item_id", item.ID, "err", err)
+			}
+		}
+		if err := r.Tasks.Tree().UpdateStatus(sessionID, item.ID, workmodel.TaskStatusCompleted); err != nil {
+			slog.Warn("item_pipeline: observational_answer UpdateStatus failed (non-fatal); session loop may iterate one extra time",
+				"session_id", sessionID, "work_item_id", item.ID, "err", err)
+		}
+	}
+
 	// Update the in-memory copy so callers reading item.LastRound see the
 	// fast-path round without re-fetching from the tree.
 	item.LastRound = round
