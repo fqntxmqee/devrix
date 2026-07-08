@@ -284,6 +284,85 @@ func TestEmitComplete_BothSummaryAndFinalBad_EmitsTaskIncomplete(t *testing.T) {
 	}
 }
 
+// DM-20260708-002 (devrix hotfix for "2×3=6" → "❌ 任务未完成" screenshot):
+// when the terminal complete event came from the observational_answer
+// fast-path, summary AND Content are intentionally short (e.g. "2×3=6")
+// and structurally pre-validated. The task_incomplete override must be
+// suppressed — the user wants to see the fast-path answer, not a generic
+// failure message. The fast-path source is propagated by D7
+// buildSessionCompleteEvent as event.Metadata["source"] with value
+// CompleteEventSourceObservationalAnswerFastPath.
+//
+// Regression guard: removing the source == fast-path branch in
+// EmitComplete (or removing the source field from the D7 side) makes
+// this test fail.
+func TestEmitComplete_FastPathSource_BothBad_PreservesAnswer(t *testing.T) {
+	sess := &types.Session{SessionID: "sess_fastpath_d1", ChatID: "chat_test"}
+	const fastPathAnswer = "2×3=6" // 4 runes — too_short, but structurally correct
+	ev := &contracts.EngineEvent{
+		Type:      "complete",
+		Content:   fastPathAnswer,
+		SessionID: "sess_fastpath_d1",
+		Metadata: map[string]string{
+			"summary":         fastPathAnswer,
+			"summary_quality": "too_short",
+			"final_quality":   "too_short",
+			"source":          CompleteEventSourceObservationalAnswerFastPath,
+		},
+	}
+	em := &recordingEmitter{}
+
+	EmitComplete(sess, ev, contracts.IMOutboundSignal{}, false, em)
+
+	msg := em.messages[0]
+	if msg.Content != fastPathAnswer {
+		t.Fatalf("fast-path answer must be preserved; got %q, want %q", msg.Content, fastPathAnswer)
+	}
+	if msg.Metadata["task_incomplete"] == "true" {
+		t.Fatalf("fast-path source must suppress task_incomplete; meta=%v", msg.Metadata)
+	}
+	// Quality meta is still recorded for observability (Jaeger / dashboards).
+	if msg.Metadata["summary_quality"] != "too_short" {
+		t.Errorf("summary_quality = %q, want too_short (gate still runs, just doesn't override)", msg.Metadata["summary_quality"])
+	}
+	// Source must be propagated to the outbound message metadata for D6
+	// Evolution / dashboards to count fast-path traffic.
+	if msg.Metadata["source"] != CompleteEventSourceObservationalAnswerFastPath {
+		t.Errorf("source = %q, want %q", msg.Metadata["source"], CompleteEventSourceObservationalAnswerFastPath)
+	}
+}
+
+// DM-20260708-002: same content + same bad quality, but source="" —
+// the existing task_incomplete override must still trigger. This pins
+// the asymmetric behavior: the fast-path bypass is opt-in via source,
+// not implicit.
+func TestEmitComplete_NoSource_BothBad_StillTriggersTaskIncomplete(t *testing.T) {
+	sess := &types.Session{SessionID: "sess_no_source", ChatID: "chat_test"}
+	ev := &contracts.EngineEvent{
+		Type:      "complete",
+		Content:   "2×3=6", // same short content as the fast-path test
+		SessionID: "sess_no_source",
+		Metadata: map[string]string{
+			"summary":         "2×3=6",
+			"summary_quality": "too_short",
+			"final_quality":   "too_short",
+			// no source field — LLM/transitional path, not fast-path
+		},
+	}
+	em := &recordingEmitter{}
+
+	EmitComplete(sess, ev, contracts.IMOutboundSignal{}, false, em)
+
+	msg := em.messages[0]
+	if msg.Content != TaskIncompleteMessage {
+		t.Fatalf("non-fast-path short content must trigger task_incomplete; got %q, want %q",
+			msg.Content, TaskIncompleteMessage)
+	}
+	if msg.Metadata["task_incomplete"] != "true" {
+		t.Fatal("expected task_incomplete meta when source is empty")
+	}
+}
+
 // TestEmitComplete_OnlySummaryBad_FallsBackToContent pins the original
 // behavior preserved for the case where the summary is bad but the
 // final Content IS a real review. This is the common path when D7's

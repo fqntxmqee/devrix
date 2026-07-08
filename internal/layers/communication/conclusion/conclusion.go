@@ -34,6 +34,19 @@ func SetBridge(t *tracer.Tracer) {
 // across IM adapters without needing per-locale wiring.
 const TaskIncompleteMessage = "（任务未能完成，AI 未产生有效结论。请重新发起。）"
 
+// CompleteEventSourceObservationalAnswerFastPath mirrors the D7
+// sessionorchestrator completeEventSourceObservationalAnswerFastPath
+// constant. D1 conclusion.EmitComplete checks this source on
+// event.Metadata["source"] to suppress the task_incomplete override when
+// the answer came from the DM-20260706-011 observational_answer fast-path.
+// The fast-path answer is structurally pre-validated by
+// pickHighStrengthBusinessFact (strength ≥ 0.9, CatBusiness ObsFact, no
+// ObsUncertainty, VerdictPass) and intentionally short — the
+// 100-rune too_short threshold does not apply. The string value MUST stay
+// in sync with the D7 side; if either side changes, both must change
+// together (no compile-time check across the D1↔D7 boundary).
+const CompleteEventSourceObservationalAnswerFastPath = "observational_answer_fastpath"
+
 // EmitText maps S16-A01 EmitSummaryChunk → OutboundMessage.
 func EmitText(session *types.Session, event *contracts.EngineEvent, sig contracts.IMOutboundSignal, hasSig bool, emit kernel.Emitter) {
 	if session == nil || event == nil || emit == nil {
@@ -98,6 +111,13 @@ func EmitComplete(session *types.Session, event *contracts.EngineEvent, sig cont
 	ctxPct := kernel.MetaField(event.Metadata, "ctx_pct")
 	summaryQuality := kernel.MetaField(event.Metadata, "summary_quality")
 	finalQuality := kernel.MetaField(event.Metadata, "final_quality")
+	// DM-20260708-002: read the D7-set source field so the
+	// task_incomplete override at the bottom of this function can be
+	// suppressed for the observational_answer fast-path. The source is
+	// a contract between D7 buildSessionCompleteEvent and D1
+	// EmitComplete — the string value must match
+	// CompleteEventSourceObservationalAnswerFastPath.
+	source := kernel.MetaField(event.Metadata, "source")
 	stats := BuildCompletionSummary(duration, usage, model, ctxPct)
 	summary := strings.TrimSpace(kernel.MetaField(event.Metadata, "summary"))
 	content := summary
@@ -122,14 +142,35 @@ func EmitComplete(session *types.Session, event *contracts.EngineEvent, sig cont
 	// final_quality signal D7 propagated; that's cheaper than re-running
 	// the structural classifier here and avoids re-importing
 	// orchestration/ into D1 (forbidden by scripts/lint-d1-imports.sh).
+	//
+	// DM-20260708-002 fast-path bypass: when event.Metadata["source"] is
+	// the observational_answer fast-path, the answer is structurally
+	// pre-validated (CatBusiness ObsFact, strength ≥ 0.9, no ObsUncertainty,
+	// VerdictPass) and the short final is the actual answer (e.g. "2×3=6",
+	// "巴黎是法国首都"). The 100-rune too_short threshold is for LLM
+	// transitional text, not fast-path answers — replacing it with
+	// TaskIncompleteMessage would mask a correct answer as a failure
+	// (screenshot 2026-07-08, sess_1783502345285_0). Source is a
+	// machine-set field on the D7 buildSessionCompleteEvent contract; the
+	// D1↔D7 string value is the same.
 	if summaryQuality == "too_short" || summaryQuality == "inconclusive" {
 		if finalQuality == "too_short" || finalQuality == "inconclusive" {
-			content = TaskIncompleteMessage
-			taskIncomplete = true
-			if fallbackSource == "" {
-				fallbackSource = "task_incomplete"
+			if source == CompleteEventSourceObservationalAnswerFastPath {
+				// Fast-path: keep the answer (already in `content` after
+				// the summary→Content fallback above). Mark
+				// task_incomplete=false explicitly even if it was
+				// hypothetically set earlier (defensive — current code
+				// doesn't set it).
+				taskIncomplete = false
+				fallbackSource = "fastpath_answer_preserved"
 			} else {
-				fallbackSource = fallbackSource + "+task_incomplete"
+				content = TaskIncompleteMessage
+				taskIncomplete = true
+				if fallbackSource == "" {
+					fallbackSource = "task_incomplete"
+				} else {
+					fallbackSource = fallbackSource + "+task_incomplete"
+				}
 			}
 		}
 	}
@@ -155,6 +196,13 @@ func EmitComplete(session *types.Session, event *contracts.EngineEvent, sig cont
 	}
 	if finalQuality != "" {
 		meta["final_quality"] = finalQuality
+	}
+	// DM-20260708-002: propagate the D7-set source to the outbound
+	// message metadata so D6 Evolution / dashboards can count fast-path
+	// traffic independently of summary_quality. Mirrors the propagation
+	// of summary_quality / final_quality above.
+	if source != "" {
+		meta["source"] = source
 	}
 	outbound := &types.OutboundMessage{
 		MessageID:  kernel.NewMessageID(),
