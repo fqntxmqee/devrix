@@ -243,18 +243,28 @@ func evidenceContains(ss []string, want string) bool {
 	return false
 }
 
+// mergeProposedObservations collects the LLM proposer's ObservationProposal[]
+// into validated Obs*, threading the prior round's WorkItemExecContext
+// (DM-20260706-004 devrix-d7-frame-delta-phase2-production-wiring) so
+// buildObserveSignalInput → BuildObservePriorDelta can rebuild the
+// FrameDelta from the previous round's ArtifactSummary.
+//
+// prevExecCtx may be nil for the very first round of a fresh WorkItem —
+// that path triggers BuildObservePriorDelta's zero-value branch and emits
+// the prior_delta_empty span (matches the testutil AC2 baseline).
 func mergeProposedObservations(
 	ctx context.Context,
 	proposer ObservationProposer,
 	sessionID string,
 	item *workmodel.WorkItem,
 	tm *workmodel.TaskManager,
+	prevExecCtx *WorkItemExecContext,
 	prior *learn.AdaptivePrior,
 ) ([]orchtypes.Observation, string, error) {
 	if proposer == nil || item == nil {
 		return nil, "", nil
 	}
-	in := buildObserveSignalInput(sessionID, item, tm, nil)
+	in := buildObserveSignalInput(sessionID, item, tm, prevExecCtx)
 	if prior != nil {
 		in.PriorMean = prior.PriorBeta.Mean()
 	}
