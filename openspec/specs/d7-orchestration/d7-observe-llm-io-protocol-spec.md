@@ -483,7 +483,7 @@ go test -v -run TestObserveTraceE2E \
 
 | 类型 | 路径 | 描述 |
 |---|---|---|
-| Spec | `openspec/changes/devrix-d7-observe-llm-protocol-doc/specs/d7-orchestration/d7-observe-llm-io-protocol-spec.md` | 本文档 |
+| Spec | `openspec/specs/d7-orchestration/d7-observe-llm-io-protocol-spec.md` | 本文档 |
 | Test | `internal/layers/orchestration/sessionorchestrator/observe_trace_e2e_test.go` | 16 trace test |
 | Demand | `openspec/changes/devrix-d7-observe-llm-protocol-doc/demand.md` | DM-20260708-003 S1 |
 | Proposal | `openspec/changes/devrix-d7-observe-llm-protocol-doc/proposal.md` | S2 lite |
