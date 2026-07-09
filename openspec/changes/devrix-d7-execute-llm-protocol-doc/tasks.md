@@ -23,27 +23,27 @@
 
 | T ID | Status | Description | Evidence |
 |------|--------|-------------|----------|
-| D7-S5-A122-T12 | PLANNED | TestExecuteTraceE2E_Commit_Success (场景 1) — 1 step ok + SideEffectCommitted + IdempotencyKey 透传 | `execute_trace_e2e_test.go:NEW` |
-| D7-S5-A122-T13 | PLANNED | TestExecuteTraceE2E_Protocol_RollbackSuccess (场景 2) — step 2 fail + 3 runner calls + SideEffectRolledBack | `execute_trace_e2e_test.go:NEW` |
-| D7-S5-A122-T14 | PLANNED | TestExecuteTraceE2E_Scenario_MajorityPass (场景 3) — 3/5 pass + SideEffectNone + majority vote | `execute_trace_e2e_test.go:NEW` |
-| D7-S5-A122-T15 | PLANNED | TestExecuteTraceE2E_Exploration_PartialSuccess (场景 4) — 2/3 成功 + 优先级排序 + sideEffectForScope(PersistTransient)=None | `execute_trace_e2e_test.go:NEW` |
-| D7-S5-A122-T16 | PLANNED | TestExecuteTraceE2E_CommitTimeout_Inflight (场景 5) — 50ms timeout + SideEffectInflight + EXEC_CHANNEL_9006 + Scenario ctx cancel + EXEC_CHANNEL_9007 不混淆 | `execute_trace_e2e_test.go:NEW` |
+| D7-S5-A122-T12 | IMPLEMENTED | TestExecuteTraceE2E_Commit_Success (场景 1) — 1 step ok + SideEffectCommitted + IdempotencyKey 透传 | `execute_trace_e2e_test.go:223-291` |
+| D7-S5-A122-T13 | IMPLEMENTED | TestExecuteTraceE2E_Protocol_RollbackSuccess (场景 2) — step 2 fail + 3 runner calls + SideEffectRolledBack | `execute_trace_e2e_test.go:299-389` |
+| D7-S5-A122-T14 | IMPLEMENTED | TestExecuteTraceE2E_Scenario_MajorityPass (场景 3) — 3/5 pass + SideEffectNone + majority vote | `execute_trace_e2e_test.go:397-499` |
+| D7-S5-A122-T15 | IMPLEMENTED | TestExecuteTraceE2E_Exploration_PartialSuccess (场景 4) — 2/3 成功 + 优先级排序 + sideEffectForScope(PersistTransient)=None | `execute_trace_e2e_test.go:507-592` |
+| D7-S5-A122-T16 | IMPLEMENTED | TestExecuteTraceE2E_CommitTimeout_Inflight (场景 5) — 50ms timeout + SideEffectInflight + EXEC_CHANNEL_9006 + Scenario ctx cancel + EXEC_CHANNEL_9007 不混淆 | `execute_trace_e2e_test.go:601-739` |
 
 ## C. 集成 (P0)
 
 | T ID | Status | Description | Evidence |
 |------|--------|-------------|----------|
-| D7-S5-A122-T17 | PLANNED | 主 spec.md §11 加 1 行 reference 指向 d7-execute-toolrunner-io-protocol-spec.md | `spec.md:NEW` |
-| D7-S5-A122-T18 | PLANNED | 主 CHANGELOG.md +1 row: devrix-d7-execute-llm-protocol-doc (2026-07-09) | `CHANGELOG.md:NEW` |
+| D7-S5-A122-T17 | IMPLEMENTED | 主 spec.md §11 加 1 行 reference 指向 d7-execute-toolrunner-io-protocol-spec.md | `spec.md:225` |
+| D7-S5-A122-T18 | IMPLEMENTED | 主 CHANGELOG.md +1 row: devrix-d7-execute-llm-protocol-doc (2026-07-09) | `CHANGELOG.md:16` |
 
 ## D. 验证 (P0)
 
 | T ID | Status | Description | Evidence |
 |------|--------|-------------|----------|
-| D7-S5-A122-T19 | PLANNED | `go test -v -run TestExecuteTraceE2E ./internal/layers/orchestration/mups/execute/...` 5/5 PASS | TBD |
-| D7-S5-A122-T20 | PLANNED | `go test -race ./internal/layers/orchestration/mups/execute/...` 全部 PASS (含 23 已有 + 5 NEW) | TBD |
-| D7-S5-A122-T21 | PLANNED | 22/22 orchestration packages go test -race 回归 | TBD |
-| D7-S5-A122-T22 | PLANNED | `go vet ./...` 0 warning | TBD |
-| D7-S5-A122-T23 | PLANNED | PR 提交 (1 spec + 5 trace test + 1 spec.md ref + 1 CHANGELOG) | TBD |
+| D7-S5-A122-T19 | IMPLEMENTED | `go test -v -run TestExecuteTraceE2E ./internal/layers/orchestration/mups/execute/...` 5/5 PASS | PASS log: 5/5 PASS (Commit_Success / Protocol_RollbackSuccess / Scenario_MajorityPass / Exploration_PartialSuccess / CommitTimeout_Inflight) |
+| D7-S5-A122-T20 | IMPLEMENTED | `go test -race ./internal/layers/orchestration/mups/execute/...` 全部 PASS (含 23 已有 + 5 NEW) | PASS log: `ok github.com/devrix/devrix/internal/layers/orchestration/mups/execute 1.625s` |
+| D7-S5-A122-T21 | IMPLEMENTED | 26/26 orchestration packages go test -race 回归 | PASS log: `26 ok` packages |
+| D7-S5-A122-T22 | IMPLEMENTED | `go vet ./...` 0 warning | PASS log: empty stderr |
+| D7-S5-A122-T23 | IMPLEMENTED | PR 提交 (1 spec + 5 trace test + 1 spec.md ref + 1 CHANGELOG) | PR #476 auto-merge enabled (squash) |
 
 **Total**: 23 T-points (11 spec sections + 5 trace test + 2 integration + 5 verification).
