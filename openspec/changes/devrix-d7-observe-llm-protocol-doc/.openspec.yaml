@@ -1,0 +1,37 @@
+change_id: devrix-d7-observe-llm-protocol-doc
+demand_id: DM-20260708-003
+title: D7 Observe ↔ LLM 5 场景输入输出协议沉淀
+priority: P1
+status: s2_proposal
+domains: [D7]
+dsaft_scenarios:
+  - D7-S5   # Observe Node (帧级 I/O 协议文档化)
+dsaft_activities:
+  - D7-S5-A120   # Observe ↔ LLM 5 场景 I/O 协议 spec + 1 trace test 补充
+t_points:
+  - D7-S5-A120-T01
+  - D7-S5-A120-T02
+  - D7-S5-A120-T03
+  - D7-S5-A120-T04
+  - D7-S5-A120-T05
+  - D7-S5-A120-T06
+  - D7-S5-A120-T07
+  - D7-S5-A120-T08
+  - D7-S5-A120-T09
+  - D7-S5-A120-T10
+  - D7-S5-A120-T11
+  - D7-S5-A120-T12
+  - D7-S5-A120-T13
+  - D7-S5-A120-T14
+  - D7-S5-A120-T15
+pr: "amend PR #472 (Trace validation 16 tests) — 追加 spec doc + 1 test"
+supersedes: []
+parent_change: devrix-d7-observational-fastpath
+parent_demand: DM-20260706-011
+version_scope:
+  d7-orchestration: "v4.28.0 → v4.29.0 (follow-up to observational-fastpath; doc-only)"
+notes: |
+  本 Change 是 devrix-d7-observational-fastpath 的 follow-up，纯 spec 沉淀 + 1 test
+  补充。不修改任何业务代码（除 1 test 注释重编号），把散落在 6 个 Go 文件 + 1 个
+  i18n 文件里的 Observe↔LLM 帧级 I/O 协议契约显式文档化。运行验证由 PR #472 的
+  16 个 trace test 提供，spec doc 与 test stdout 一一对应。
