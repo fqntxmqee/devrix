@@ -553,7 +553,7 @@ go test -v -run TestPlanTraceE2E \
 
 | 类型 | 路径 | 描述 |
 |---|---|---|
-| Spec | `openspec/changes/devrix-d7-plan-llm-protocol-doc/specs/d7-orchestration/d7-plan-llm-io-protocol-spec.md` | 本文档 |
+| Spec | `openspec/specs/d7-orchestration/d7-plan-llm-io-protocol-spec.md` | 本文档 |
 | Test | `internal/layers/orchestration/sessionorchestrator/plan_trace_e2e_test.go` | 5 NEW trace test |
 | Demand | `openspec/changes/devrix-d7-plan-llm-protocol-doc/demand.md` | DM-20260708-004 S1 |
 | Proposal | `openspec/changes/devrix-d7-plan-llm-protocol-doc/proposal.md` | S2 lite |
