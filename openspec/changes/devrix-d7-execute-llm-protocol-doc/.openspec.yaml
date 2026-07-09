@@ -1,0 +1,48 @@
+change_id: devrix-d7-execute-llm-protocol-doc
+demand_id: DM-20260708-005
+title: D7 Execute ↔ ToolRunner 4 Channel 5 场景输入输出协议沉淀
+priority: P1
+status: s2_proposal
+domains: [D7]
+dsaft_scenarios:
+  - D7-S5   # Execute Node (4 Channel 帧级 I/O 协议文档化)
+dsaft_activities:
+  - D7-S5-A122   # Execute ↔ ToolRunner 4 Channel 5 场景 I/O 协议 spec + 5 trace test
+t_points:
+  - D7-S5-A122-T01
+  - D7-S5-A122-T02
+  - D7-S5-A122-T03
+  - D7-S5-A122-T04
+  - D7-S5-A122-T05
+  - D7-S5-A122-T06
+  - D7-S5-A122-T07
+  - D7-S5-A122-T08
+  - D7-S5-A122-T09
+  - D7-S5-A122-T10
+  - D7-S5-A122-T11
+  - D7-S5-A122-T12
+  - D7-S5-A122-T13
+  - D7-S5-A122-T14
+  - D7-S5-A122-T15
+  - D7-S5-A122-T16
+  - D7-S5-A122-T17
+  - D7-S5-A122-T18
+  - D7-S5-A122-T19
+  - D7-S5-A122-T20
+  - D7-S5-A122-T21
+  - D7-S5-A122-T22
+  - D7-S5-A122-T23
+pr: "独立 PR (1 spec doc + 5 trace test + 1 spec.md ref + 1 CHANGELOG row)"
+supersedes: []
+parent_change: devrix-d7-plan-llm-protocol-doc
+parent_demand: DM-20260708-004
+version_scope:
+  d7-orchestration: "v4.30.0 → v4.31.0 (follow-up to plan-llm-io-protocol; doc-only + 5 trace test)"
+notes: |
+  本 Change 是 devrix-d7-plan-llm-protocol-doc 的对称 follow-up,纯 spec 沉淀 + 5
+  trace test 补充。Execute 节点与 Observe/Plan 节点的根本区别是**不进 LLM**,通过
+  4 Channel (Commit/Protocol/Scenario/Exploration) 把 plan.Step 派发到 pluggable
+  ToolRunner。spec doc 与现有 23 个 execute_test.go 测试 (797 lines) 互补, 不重复。
+  spec 写到 canonical openspec/specs/d7-orchestration/ 位置 (per 用户 2026-07-09
+  反馈 "文档的位置不对, 应该放到 specs 对应目录, 而不是归档目录"), 变更目录只放
+  OpenSpec 流程文件 (demand.md / proposal.md / tasks.md / .openspec.yaml)。
