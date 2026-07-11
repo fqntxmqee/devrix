@@ -1426,6 +1426,27 @@ session_turn_loop.RunParallelExplore (S2-A50 LoopDepthTracker v2)
 
 ---
 
+### D7-S5-A122: Observe 全节点协议 + fast-path source 过滤 (DM-20260711-001) — Change: `devrix-d7-observe-node-spec` (S4_InProgress)
+
+| T ID | 描述 | L4 | Evidence | Status | Priority | Tag |
+|------|------|-----|----------|--------|----------|-----|
+| **D7-S5-A122-T01** | `observe-node-spec.md` §1–§12 全节点 SoT + OBS-E/U/O + §12 反查 | `observe_node_protocol` | `openspec/specs/d7-orchestration/observe-node-spec.md` | **IMPLEMENTED** | **P0** | Observe_NodeSpec |
+| **D7-S5-A122-T02** | `d7-observe-llm-io-protocol-spec.md` Review 版重写 | `observe_node_protocol` | `openspec/specs/d7-orchestration/d7-observe-llm-io-protocol-spec.md` | **IMPLEMENTED** | **P0** | Observe_LLMI/O |
+| **D7-S5-A122-T03** | change 包 demand/proposal/design/tasks + delta spec | `observe_node_protocol` | `openspec/changes/devrix-d7-observe-node-spec/` | **IMPLEMENTED** | **P0** | Observe_NodeSpec |
+| **D7-S5-A122-T04** | `spec.md` lite §12 + CHANGELOG 条目 | `observe_node_protocol` | `openspec/specs/d7-orchestration/spec.md` + `CHANGELOG.md` | **IMPLEMENTED** | **P0** | Observe_NodeSpec |
+| **D7-S5-A122-T05** | `pickHighStrengthBusinessFact` 两遍扫描 + directive echo 排除 | `observe_fastpath_pick` | `deliverable_execute.go` + `item_pipeline.go:302` | **IMPLEMENTED** | **P0** | Observe_FastPath |
+| **D7-S5-A122-T06** | 单元测试 LLM 优先于 echo | `observe_fastpath_pick` | `deliverable_execute_test.go::TestPickHighStrength_*` | **IMPLEMENTED** | **P0** | Observe_FastPath |
+| **D7-S5-A122-T07** | 集成测试 prior≥0.85 仍 emit LLM 答案 | `observe_fastpath_pick` | `item_pipeline_fastpath_test.go::TestObservationalAnswerFastPath_Prior09_EmitsLLMAnswer` | **IMPLEMENTED** | **P0** | Observe_FastPath |
+| **D7-S5-A122-T08** | U08 deliverable incomplete trace | `observe_node_merge` | `observe_trace_e2e_test.go::TestObserveTraceE2E_DeliverableIncompleteSignals` | **IMPLEMENTED** | **P0** | Observe_Mechanical |
+| **D7-S5-A122-T09** | P2 CatSystem promote | `observe_category_promote` | — | **PLANNED** | **P1** | Observe_Promote |
+| **D7-S5-A122-T10** | P3 scope 去重（LLM frame 省略 open questions） | `observe_llm_classifier` | — | **PLANNED** | **P1** | Observe_Scope |
+| **D7-S5-A122-T11** | P4 signal 注册表 | `observe_signal_registry` | — | **PLANNED** | **P1** | Observe_Signal |
+| **D7-S5-A122-T12** | P5 observeLLMFieldMap SoT 统一 | `observe_llm_classifier` | — | **PLANNED** | **P1** | Observe_SoT |
+
+**A122 Total:** 8 IMPLEMENTED (Wave 1–2) + 4 PLANNED (Wave 3–4)
+
+---
+
 ## D7-S16 ~ S19: TaskContract 统一 (DM-20260629-006) — DESIGN ONLY
 
 > **Change:** `devrix-d7-taskcontract-unification` (DM-20260629-006)  
