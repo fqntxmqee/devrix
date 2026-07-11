@@ -329,7 +329,7 @@ func TestObserveTraceE2E_ObsFact_FastPathTrigger(t *testing.T) {
 
 	// fast-path gate 验证: pickHighStrengthBusinessFact(0.85) 应命中
 	rep, _ := orchtypes.NewUncertaintyReport(in.SessionID, obs)
-	_, stmt, ok := pickHighStrengthBusinessFact(rep, 0.85)
+	_, stmt, ok := pickHighStrengthBusinessFact(rep, 0.85, in.Directive)
 	if !ok {
 		t.Errorf("❌ fast-path gate FAIL: pickHighStrengthBusinessFact(rep, 0.85) = (_, _, false)")
 	} else {
@@ -385,7 +385,7 @@ func TestObserveTraceE2E_ObsUncertainty_PlanDecompose(t *testing.T) {
 	}
 
 	// pickHighStrengthBusinessFact 不应命中 (no ObsFact)
-	if _, _, ok := pickHighStrengthBusinessFact(rep, 0.85); ok {
+	if _, _, ok := pickHighStrengthBusinessFact(rep, 0.85, in.Directive); ok {
 		t.Errorf("❌ fast-path gate HIT (unexpected): no ObsFact, gate should be closed")
 	}
 }
@@ -928,7 +928,7 @@ func TestObserveTraceE2E_FactPlusUncertainty_FastPathBlocked(t *testing.T) {
 	rep, _ := orchtypes.NewUncertaintyReport(in.SessionID, obs)
 
 	// 闸门 1: pickHighStrengthBusinessFact 仍然命中 (fact 强度 0.85)
-	_, factStmt, factHit := pickHighStrengthBusinessFact(rep, 0.85)
+	_, factStmt, factHit := pickHighStrengthBusinessFact(rep, 0.85, in.Directive)
 	if !factHit {
 		t.Errorf("pickHighStrengthBusinessFact should hit on fact str=0.85, got miss")
 	} else {
@@ -1014,6 +1014,71 @@ func TestObserveTraceE2E_FullPipeline_FactFastPath(t *testing.T) {
 	if !got.Locked {
 		t.Errorf("item.Locked = false, want true")
 	}
+}
+
+// =============================================================================
+// 测试 17: U08 — deliverable incomplete 机械信号（不经 LLM）
+// =============================================================================
+
+func TestObserveTraceE2E_DeliverableIncompleteSignals(t *testing.T) {
+	item := &workmodel.WorkItem{
+		ID:        "wi_deliv_u08",
+		Directive: "finish the review",
+		LastRound: &workmodel.WorkItemPipelineRound{
+			DeliverableStatus: workmodel.DeliverableStatusIncomplete,
+			DeliverableReason: "planning_meta",
+			ExecuteToolCalls:  2,
+		},
+	}
+
+	printBanner(t, "TestObserveTraceE2E_DeliverableIncompleteSignals — OBS-U08 mechanical layer")
+	obs := observeDeliverableSignals(item)
+	if len(obs) < 2 {
+		t.Fatalf("expected ≥2 deliverable signals, got %d: %+v", len(obs), obs)
+	}
+
+	var hasIncomplete, hasToolCalls, hasReason bool
+	for _, o := range obs {
+		switch o.Kind {
+		case orchtypes.ObsSignal:
+			sp, ok := o.Payload.(orchtypes.SignalPayload)
+			if !ok {
+				continue
+			}
+			if sp.Name == "deliverable_incomplete" {
+				hasIncomplete = true
+			}
+			if sp.Name == "evidence_tool_calls" {
+				hasToolCalls = true
+			}
+		case orchtypes.ObsFact:
+			fp, ok := o.Payload.(orchtypes.FactPayload)
+			if ok && strings.Contains(fp.Statement, "deliverable_reason:") {
+				hasReason = true
+			}
+		}
+		if o.Source != "verify_signal" {
+			t.Errorf("deliverable signal source = %q, want verify_signal", o.Source)
+		}
+	}
+	if !hasIncomplete {
+		t.Error("missing deliverable_incomplete signal")
+	}
+	if !hasToolCalls {
+		t.Error("missing evidence_tool_calls signal")
+	}
+	if !hasReason {
+		t.Error("missing deliverable_reason fact")
+	}
+
+	rep, err := orchtypes.NewUncertaintyReport("sess_u08", obs)
+	if err != nil {
+		t.Fatalf("NewUncertaintyReport: %v", err)
+	}
+	if hasObsUncertainty(rep) {
+		t.Error("deliverable verify_signal must not block fast-path via hasObsUncertainty")
+	}
+	t.Logf("  ✓ OBS-U08: %d mechanical obs from verify_signal (no LLM required)", len(obs))
 }
 
 // =============================================================================

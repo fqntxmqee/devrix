@@ -1,0 +1,32 @@
+change_id: devrix-d7-observe-node-spec
+demand_id: DM-20260711-001
+title: D7 Observe 节点全协议修订 + 实现债闭环
+priority: P1
+status: s4_in_progress
+domains: [D7]
+dsaft_scenarios:
+  - D7-S5   # Observe Node
+dsaft_activities:
+  - D7-S5-A122   # Observe 全节点 spec + P1 fast-path (A121 已属 DM-20260706-008)
+t_points:
+  - D7-S5-A122-T01
+  - D7-S5-A122-T02
+  - D7-S5-A122-T03
+  - D7-S5-A122-T04
+  - D7-S5-A122-T05
+  - D7-S5-A122-T06
+  - D7-S5-A122-T07
+  - D7-S5-A122-T08
+  - D7-S5-A122-T09
+  - D7-S5-A122-T10
+  - D7-S5-A122-T11
+  - D7-S5-A122-T12
+parent_change: devrix-d7-observe-llm-protocol-doc
+parent_demand: DM-20260708-003
+supersedes_sections:
+  - d7-observe-llm-io-protocol-spec.md#5
+version_scope:
+  d7-orchestration: "v4.29.0 → v4.30.0"
+notes: |
+  S4 Wave 1–2 已落地：observe-node-spec + LLM I/O Review 版 + P1 fast-path source 过滤 + U08 trace。
+  Wave 3–4 待办：P2 CatSystem promote + P3 scope 去重 + P4/P5 SoT。
