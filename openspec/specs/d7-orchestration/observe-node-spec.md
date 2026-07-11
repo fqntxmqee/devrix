@@ -175,16 +175,17 @@ ObserveSignalInput / LLM user frame
 
 > **输入协议不编码 ObsKind。** 所有用户用例共享同一 schema；差异仅为字段是否非空及取值。用例分类见 §7 证据剖面 **OBS-E0–E7**。
 
-### 4.0 唯一输入 schema（LLM 可见 6 标签）
+### 4.0 唯一输入 schema（LLM 可见 5 标签）
 
 | 标签 | 出现条件 | 角色 |
 |------|---------|------|
 | `directive` | 无条件 | 主证据 |
 | `prior_parse_reject` | 非空 | 跨轮格式反馈（control） |
 | `scope_goal` | 非空 | 已收缩目标（data） |
-| `scope_open_question` | len>0 | 待闭合问题作证据（data） |
 | `signal` | len>0 | 注册表前缀行（data） |
 | `prior_observation_ids` | len>0 | 跨轮锚点（control） |
+
+> **P3（已实现）**：`scope_open_question` 仅由 Go `mapScopeContractToObservations` 注入 `ObsUncertainty`，**不进** LLM user frame。
 
 ### 4.1 Layer A — `ObserveSignalInput` struct（11 frame 字段）
 
@@ -198,7 +199,7 @@ ObserveSignalInput / LLM user frame
 | 3 | `PriorParseReject` | string | control | ✅ | `TrimSpace != ""` |
 | 4 | `PriorMean` | float64 | control | ❌ | Learn 输出；防锚定 |
 | 5 | `ScopeGoal` | string | data | ✅ | `TrimSpace != ""` |
-| 6 | `ScopeOpenQuestions` | []string | data | ✅ | `len > 0` |
+| 6 | `ScopeOpenQuestions` | []string | data | ❌ | `len > 0`（Go-only，P3） |
 | 7 | `InboundSignalLines` | []string | data | ✅ | `len > 0`（pt: `signal`） |
 | 8 | `PriorObservationIDs` | []string | control | ✅ | `len > 0` |
 | 9 | `IncrementalOnly` | bool | control | ❌ | `PriorObservationIDs` 非空时 true |
@@ -217,14 +218,13 @@ ObserveSignalInput / LLM user frame
 - 格式：`key: value\n`（多行字段每元素一行）
 - 前缀：i18n `RenderFrameFieldGuideForFields`（仅对已出现字段）
 
-**LLM 可见字段全集（6 标签，均 omit_empty）**：
+**LLM 可见字段全集（5 标签，均 omit_empty）**：
 
 | 标签 | 条件 |
 |------|------|
 | `directive` | 无条件 |
 | `prior_parse_reject` | 非空 |
 | `scope_goal` | 非空 |
-| `scope_open_question` | len > 0 |
 | `signal` | len > 0 |
 | `prior_observation_ids` | len > 0 |
 
@@ -638,27 +638,21 @@ prior_observation_ids: obs_1, obs_2
 - 方案 A：`pickHighStrength` 仅接受 `source=observation_proposer`
 - 方案 B：directive echo 改为 ObsSignal（`name=directive_echo`），退出 fact 池
 
-### 8.2 P2 — CatSystem 提升未实现
+### 8.2 P2 — CatSystem 提升 ✅
 
-**现象**：LLM 恒 `CatBusiness`；ObsDeviation→Anomalies 仅在测试手动 `Category=CatSystem`。
+**实现**：`observe_category_promote.go::promoteSystemCategory`；`mergeProposedObservations` 在 validate 后调用；`artifact_summary` 含 baseline/observed 时 ObsDeviation→CatSystem。
 
-**建议**：新增 `promoteSystemCategory(obs, signals)`，规则见 signal 中 baseline/observed delta 模式。
+### 8.3 P3 — scope 双重注入 ✅
 
-### 8.3 P3 — scope 双重注入
+**实现**：`observeLLMFieldMap` 省略 `scope_open_question`；`mapScopeContractToObservations` 独占 Go 注入路径。
 
-**现象**：`scope_open_question` 同时进 LLM frame 与 `mapScopeContractToObservations`。
+### 8.4 P4 — signal 词汇表 ✅（v1 前缀）
 
-**建议**：二选一（推荐保留 Go 机械层，LLM frame 省略 open questions）。
+**实现**：`observe_signal_registry.go` 注册 `artifact_summary:` / `child_downlink_scope_in:` / `expected_return:`；`buildObserveSignalInput` 经 `formatObserveSignalLine` 发射。
 
-### 8.4 P4 — signal 词汇表未注册扩展项
+### 8.5 P5 — observeLLMFieldMap 与 pt tag 双 SoT ⏳
 
-**现象**：文档/旧 spec 中的 `metric_kv` 行不在 `buildObserveSignalInput`。
-
-**建议**：注册表 + i18n + wiring 三件套后再写进场景矩阵。
-
-### 8.5 P5 — observeLLMFieldMap 与 pt tag 双 SoT
-
-**建议**：由 `FrameObserveUser` + omit 规则生成 LLM 可见字段，删除手写 map。
+**状态**：P1 例外延后；手写 map 仍 SoT，pt-tag 派生另开 change。
 
 ---
 

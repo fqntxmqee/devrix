@@ -200,7 +200,7 @@ func TestObserveTraceE2E_OnlyFieldsVisibleToLLM(t *testing.T) {
 	// 直接调 buildLLMObservationUserPrompt (bypass LLM)
 	rendered := buildLLMObservationUserPrompt(full, i18n.LocaleZH)
 
-	printBanner(t, "TestObserveTraceE2E_OnlyFieldsVisibleToLLM — 11→6 字段过滤 trace")
+	printBanner(t, "TestObserveTraceE2E_OnlyFieldsVisibleToLLM — 11→5 字段过滤 trace")
 	t.Logf("─── 输入: ObserveSignalInput (11 字段全填) ───")
 	t.Logf("  WorkItemID=%q Directive=%q", full.WorkItemID, full.Directive)
 	t.Logf("  PriorParseReject=%q PriorMean=%.2f", full.PriorParseReject, full.PriorMean)
@@ -212,10 +212,10 @@ func TestObserveTraceE2E_OnlyFieldsVisibleToLLM(t *testing.T) {
 	t.Logf("\n─── LLM user prompt (实际渲染) ───")
 	t.Logf("%s", rendered)
 
-	// ── 断言 LLM 实际看到的 6 字段 ──
+	// ── 断言 LLM 实际看到的 5 字段（P3: scope_open_question 仅 Go 注入）──
 	expectedInPrompt := []string{
 		"directive", "prior_parse_reject", "scope_goal",
-		"scope_open_question", "signal", "prior_observation_ids",
+		"signal", "prior_observation_ids",
 	}
 	for _, k := range expectedInPrompt {
 		if !strings.Contains(rendered, k) {
@@ -250,7 +250,7 @@ func TestObserveTraceE2E_OnlyFieldsVisibleToLLM(t *testing.T) {
 	t.Logf("  │ prior_parse_reject   │  ✓    │ 上一轮 parse 失败原因 (LLM 自纠)         │")
 	t.Logf("  │ prior_mean           │  ✗    │ Bayesian 信誉, Go 算 confidence 校准     │")
 	t.Logf("  │ scope_goal           │  ✓    │ scope 收缩目标                            │")
-	t.Logf("  │ scope_open_question  │  ✓    │ 待闭合的 OpenQuestion, LLM 看是否还能答  │")
+	t.Logf("  │ scope_open_question  │  ✗    │ Go-only: mapScopeContract 注入 uncertainty │")
 	t.Logf("  │ signal               │  ✓    │ 多行结构化输入 (artifact_summary, etc)  │")
 	t.Logf("  │ prior_observation_ids│  ✓    │ 跨轮去重, 避免 LLM 重复提相同 obs       │")
 	t.Logf("  │ incremental_only     │  ✗    │ bool 标志, structbind 跳过                │")
@@ -466,14 +466,10 @@ func TestObserveTraceE2E_ObsDeviation_AnomalyTrigger(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ProposeObservations: %v", err)
 	}
-	// 关键 hack: 模拟"调用方后续手动改 Category 为 CatSystem"
-	// (真实生产路径是某个上游 detector 改的,例如 DetectAnomalies)
-	for i := range proposals {
-		proposals[i].Category = orchtypes.CatSystem
-	}
 	printProposals(t, proposals)
 
 	obs, _ := ValidateObservationProposals(proposals, in.SessionID, in.WorkItemID)
+	obs = promoteSystemCategory(obs, in.InboundSignalLines)
 	printReportPartition(t, in.SessionID, obs)
 
 	// ── 关键断言 ──
