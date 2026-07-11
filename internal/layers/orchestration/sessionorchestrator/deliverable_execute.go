@@ -216,22 +216,36 @@ func hasObsUncertainty(report orchtypes.UncertaintyReport) bool {
 //
 // Returns ("", "", false) when no qualifying fact exists; callers must treat
 // the bool as the authoritative gate signal.
-func pickHighStrengthBusinessFact(report orchtypes.UncertaintyReport, threshold float64) (string, string, bool) {
-	for _, o := range report.Observations {
-		if o.Kind != orchtypes.ObsFact || o.Category != orchtypes.CatBusiness || o.Strength < threshold {
-			continue
+func pickHighStrengthBusinessFact(report orchtypes.UncertaintyReport, threshold float64, directive string) (string, string, bool) {
+	trimmedDirective := strings.TrimSpace(directive)
+	tryPick := func(preferLLM bool) (string, string, bool) {
+		for _, o := range report.Observations {
+			if o.Kind != orchtypes.ObsFact || o.Category != orchtypes.CatBusiness || o.Strength < threshold {
+				continue
+			}
+			fp, ok := o.Payload.(orchtypes.FactPayload)
+			if !ok {
+				continue
+			}
+			stmt := strings.TrimSpace(fp.Statement)
+			if stmt == "" {
+				continue
+			}
+			if preferLLM {
+				if o.Source != llmObsProposerSource {
+					continue
+				}
+			} else if o.Source == "item_pipeline" && trimmedDirective != "" && stmt == trimmedDirective {
+				continue
+			}
+			return o.ID, stmt, true
 		}
-		fp, ok := o.Payload.(orchtypes.FactPayload)
-		if !ok {
-			continue
-		}
-		stmt := strings.TrimSpace(fp.Statement)
-		if stmt == "" {
-			continue
-		}
-		return o.ID, stmt, true
+		return "", "", false
 	}
-	return "", "", false
+	if id, stmt, ok := tryPick(true); ok {
+		return id, stmt, true
+	}
+	return tryPick(false)
 }
 
 // extractObservationQuestion reads UncertaintyPayload.Question regardless

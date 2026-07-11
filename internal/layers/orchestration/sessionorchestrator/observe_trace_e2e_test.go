@@ -200,7 +200,7 @@ func TestObserveTraceE2E_OnlyFieldsVisibleToLLM(t *testing.T) {
 	// 直接调 buildLLMObservationUserPrompt (bypass LLM)
 	rendered := buildLLMObservationUserPrompt(full, i18n.LocaleZH)
 
-	printBanner(t, "TestObserveTraceE2E_OnlyFieldsVisibleToLLM — 11→6 字段过滤 trace")
+	printBanner(t, "TestObserveTraceE2E_OnlyFieldsVisibleToLLM — 11→5 字段过滤 trace")
 	t.Logf("─── 输入: ObserveSignalInput (11 字段全填) ───")
 	t.Logf("  WorkItemID=%q Directive=%q", full.WorkItemID, full.Directive)
 	t.Logf("  PriorParseReject=%q PriorMean=%.2f", full.PriorParseReject, full.PriorMean)
@@ -212,10 +212,10 @@ func TestObserveTraceE2E_OnlyFieldsVisibleToLLM(t *testing.T) {
 	t.Logf("\n─── LLM user prompt (实际渲染) ───")
 	t.Logf("%s", rendered)
 
-	// ── 断言 LLM 实际看到的 6 字段 ──
+	// ── 断言 LLM 实际看到的 5 字段（P3: scope_open_question 仅 Go 注入）──
 	expectedInPrompt := []string{
 		"directive", "prior_parse_reject", "scope_goal",
-		"scope_open_question", "signal", "prior_observation_ids",
+		"signal", "prior_observation_ids",
 	}
 	for _, k := range expectedInPrompt {
 		if !strings.Contains(rendered, k) {
@@ -250,7 +250,7 @@ func TestObserveTraceE2E_OnlyFieldsVisibleToLLM(t *testing.T) {
 	t.Logf("  │ prior_parse_reject   │  ✓    │ 上一轮 parse 失败原因 (LLM 自纠)         │")
 	t.Logf("  │ prior_mean           │  ✗    │ Bayesian 信誉, Go 算 confidence 校准     │")
 	t.Logf("  │ scope_goal           │  ✓    │ scope 收缩目标                            │")
-	t.Logf("  │ scope_open_question  │  ✓    │ 待闭合的 OpenQuestion, LLM 看是否还能答  │")
+	t.Logf("  │ scope_open_question  │  ✗    │ Go-only: mapScopeContract 注入 uncertainty │")
 	t.Logf("  │ signal               │  ✓    │ 多行结构化输入 (artifact_summary, etc)  │")
 	t.Logf("  │ prior_observation_ids│  ✓    │ 跨轮去重, 避免 LLM 重复提相同 obs       │")
 	t.Logf("  │ incremental_only     │  ✗    │ bool 标志, structbind 跳过                │")
@@ -329,7 +329,7 @@ func TestObserveTraceE2E_ObsFact_FastPathTrigger(t *testing.T) {
 
 	// fast-path gate 验证: pickHighStrengthBusinessFact(0.85) 应命中
 	rep, _ := orchtypes.NewUncertaintyReport(in.SessionID, obs)
-	_, stmt, ok := pickHighStrengthBusinessFact(rep, 0.85)
+	_, stmt, ok := pickHighStrengthBusinessFact(rep, 0.85, in.Directive)
 	if !ok {
 		t.Errorf("❌ fast-path gate FAIL: pickHighStrengthBusinessFact(rep, 0.85) = (_, _, false)")
 	} else {
@@ -385,7 +385,7 @@ func TestObserveTraceE2E_ObsUncertainty_PlanDecompose(t *testing.T) {
 	}
 
 	// pickHighStrengthBusinessFact 不应命中 (no ObsFact)
-	if _, _, ok := pickHighStrengthBusinessFact(rep, 0.85); ok {
+	if _, _, ok := pickHighStrengthBusinessFact(rep, 0.85, in.Directive); ok {
 		t.Errorf("❌ fast-path gate HIT (unexpected): no ObsFact, gate should be closed")
 	}
 }
@@ -466,14 +466,10 @@ func TestObserveTraceE2E_ObsDeviation_AnomalyTrigger(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ProposeObservations: %v", err)
 	}
-	// 关键 hack: 模拟"调用方后续手动改 Category 为 CatSystem"
-	// (真实生产路径是某个上游 detector 改的,例如 DetectAnomalies)
-	for i := range proposals {
-		proposals[i].Category = orchtypes.CatSystem
-	}
 	printProposals(t, proposals)
 
 	obs, _ := ValidateObservationProposals(proposals, in.SessionID, in.WorkItemID)
+	obs = promoteSystemCategory(obs, in.InboundSignalLines)
 	printReportPartition(t, in.SessionID, obs)
 
 	// ── 关键断言 ──
@@ -928,7 +924,7 @@ func TestObserveTraceE2E_FactPlusUncertainty_FastPathBlocked(t *testing.T) {
 	rep, _ := orchtypes.NewUncertaintyReport(in.SessionID, obs)
 
 	// 闸门 1: pickHighStrengthBusinessFact 仍然命中 (fact 强度 0.85)
-	_, factStmt, factHit := pickHighStrengthBusinessFact(rep, 0.85)
+	_, factStmt, factHit := pickHighStrengthBusinessFact(rep, 0.85, in.Directive)
 	if !factHit {
 		t.Errorf("pickHighStrengthBusinessFact should hit on fact str=0.85, got miss")
 	} else {
@@ -1014,6 +1010,71 @@ func TestObserveTraceE2E_FullPipeline_FactFastPath(t *testing.T) {
 	if !got.Locked {
 		t.Errorf("item.Locked = false, want true")
 	}
+}
+
+// =============================================================================
+// 测试 17: U08 — deliverable incomplete 机械信号（不经 LLM）
+// =============================================================================
+
+func TestObserveTraceE2E_DeliverableIncompleteSignals(t *testing.T) {
+	item := &workmodel.WorkItem{
+		ID:        "wi_deliv_u08",
+		Directive: "finish the review",
+		LastRound: &workmodel.WorkItemPipelineRound{
+			DeliverableStatus: workmodel.DeliverableStatusIncomplete,
+			DeliverableReason: "planning_meta",
+			ExecuteToolCalls:  2,
+		},
+	}
+
+	printBanner(t, "TestObserveTraceE2E_DeliverableIncompleteSignals — OBS-U08 mechanical layer")
+	obs := observeDeliverableSignals(item)
+	if len(obs) < 2 {
+		t.Fatalf("expected ≥2 deliverable signals, got %d: %+v", len(obs), obs)
+	}
+
+	var hasIncomplete, hasToolCalls, hasReason bool
+	for _, o := range obs {
+		switch o.Kind {
+		case orchtypes.ObsSignal:
+			sp, ok := o.Payload.(orchtypes.SignalPayload)
+			if !ok {
+				continue
+			}
+			if sp.Name == "deliverable_incomplete" {
+				hasIncomplete = true
+			}
+			if sp.Name == "evidence_tool_calls" {
+				hasToolCalls = true
+			}
+		case orchtypes.ObsFact:
+			fp, ok := o.Payload.(orchtypes.FactPayload)
+			if ok && strings.Contains(fp.Statement, "deliverable_reason:") {
+				hasReason = true
+			}
+		}
+		if o.Source != "verify_signal" {
+			t.Errorf("deliverable signal source = %q, want verify_signal", o.Source)
+		}
+	}
+	if !hasIncomplete {
+		t.Error("missing deliverable_incomplete signal")
+	}
+	if !hasToolCalls {
+		t.Error("missing evidence_tool_calls signal")
+	}
+	if !hasReason {
+		t.Error("missing deliverable_reason fact")
+	}
+
+	rep, err := orchtypes.NewUncertaintyReport("sess_u08", obs)
+	if err != nil {
+		t.Fatalf("NewUncertaintyReport: %v", err)
+	}
+	if hasObsUncertainty(rep) {
+		t.Error("deliverable verify_signal must not block fast-path via hasObsUncertainty")
+	}
+	t.Logf("  ✓ OBS-U08: %d mechanical obs from verify_signal (no LLM required)", len(obs))
 }
 
 // =============================================================================

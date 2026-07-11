@@ -124,7 +124,7 @@ func buildObserveSignalInput(sessionID string, item *workmodel.WorkItem, tm *wor
 	if item != nil && item.LastRound != nil {
 		if s := strings.TrimSpace(item.LastRound.ArtifactSummary); s != "" {
 			in.InboundSignalLines = append(in.InboundSignalLines,
-				"artifact_summary: "+workmodel.TruncateArtifactSummary(s, 240))
+				formatObserveSignalLine(SignalPrefixArtifactSummary, workmodel.TruncateArtifactSummary(s, 240)))
 		}
 	}
 	if item != nil && item.LastRound != nil && len(item.LastRound.ObservationIDs) > 0 {
@@ -140,11 +140,11 @@ func buildObserveSignalInput(sessionID string, item *workmodel.WorkItem, tm *wor
 		if dl, ok := tm.ChildDownlinkFor(sessionID, item.ID); ok {
 			if len(dl.ScopeIn) > 0 {
 				in.InboundSignalLines = append(in.InboundSignalLines,
-					"child_downlink_scope_in: "+strings.Join(dl.ScopeIn, ", "))
+					formatObserveSignalLine(SignalPrefixChildDownlinkScope, strings.Join(dl.ScopeIn, ", ")))
 			}
 			if dl.ExpectedReturn != "" {
 				in.InboundSignalLines = append(in.InboundSignalLines,
-					"expected_return: "+dl.ExpectedReturn)
+					formatObserveSignalLine(SignalPrefixExpectedReturn, dl.ExpectedReturn))
 			}
 		}
 	}
@@ -282,5 +282,6 @@ func mergeProposedObservations(
 	if len(proposals) > 0 && len(obs) == 0 {
 		return nil, prompttags.NewObserveParseReject(prompttags.RejectValidateEmpty, "all proposals failed validation", "").CompactJSON(), nil
 	}
+	obs = promoteSystemCategory(obs, in.InboundSignalLines)
 	return obs, "", nil
 }

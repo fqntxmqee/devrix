@@ -299,7 +299,7 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	// path with no error.
 	if !isRollup && !isDeliverableSynth && !isParentRollup && r.Learner != nil &&
 		!hasObsUncertainty(report) {
-		if obsID, factStmt, ok := pickHighStrengthBusinessFact(report, 0.85); ok {
+		if obsID, factStmt, ok := pickHighStrengthBusinessFact(report, 0.85, directive); ok {
 			round, fpErr := r.maybeObservationalAnswer(ctx, sessionID, item, report, obsIDs, obsID, factStmt, started, roundNo, frame.Trigger)
 			if fpErr != nil {
 				// Fast-path construction failed (e.g. tree mutation error);
