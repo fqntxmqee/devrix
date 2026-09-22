@@ -556,7 +556,7 @@ func TestPlanTraceE2E_SingleModeFastPathBypass(t *testing.T) {
 		t.Errorf("❌ ExecutionMode=%q want 'single'", prop.ExecutionMode)
 	}
 	// 闸门 1: pickHighStrengthBusinessFact 命中 (fact str=0.95 ≥ 0.9)
-	if !hasHighStrengthFact(rep, 0.9) {
+	if !hasHighStrengthFact(rep, 0.9, in.Directive) {
 		t.Errorf("❌ hasHighStrengthFact(rep, 0.9) = false, want true (ObsFact str=0.95 应命中)")
 	} else {
 		t.Logf("  ✓ hasHighStrengthFact(rep, 0.9) HIT (ObsFact str=0.95)")

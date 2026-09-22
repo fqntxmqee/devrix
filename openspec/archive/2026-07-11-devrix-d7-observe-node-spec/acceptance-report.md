@@ -16,7 +16,7 @@ verdict: ACCEPTED
 |------|---|
 | 需求 ID | DM-20260711-001 |
 | Change ID | devrix-d7-observe-node-spec |
-| Activity ID | D7-S5-A122 |
+| Activity ID | D7-S5-A123 |
 | 总体结论 | **ACCEPTED**（P0 全绿；P1 AC5 PASS；P1 AC P5 记例外） |
 
 Wave 1–2（文档 + fast-path）与 Wave 3（P2 promote + P3 scope + P4 signal v1）已落地；P5 pt-tag 派生延后另开 change。
@@ -52,7 +52,7 @@ Wave 1–2（文档 + fast-path）与 Wave 3（P2 promote + P3 scope + P4 signal
 |------|------|
 | `openspec/specs/d7-orchestration/observe-node-spec.md` | ✅ §4 5 标签 + §8 P2–P4 已实现 |
 | `openspec/specs/d7-orchestration/spec.md` | ✅ §12 引用 |
-| `openspec/specs/d7-orchestration/t-registry.md` | ✅ D7-S5-A122 |
+| `openspec/specs/d7-orchestration/t-registry.md` | ✅ D7-S5-A123 |
 | `openspec/specs/d7-orchestration/CHANGELOG.md` | ✅ 归档行更新 |
 | `openspec/demand-archive-index.md` | ✅ S7 登记 |
 

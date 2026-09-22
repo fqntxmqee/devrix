@@ -731,7 +731,7 @@ func applySingleModeUncertaintyGate(prop *StrategicPlanProposal, in StrategicPla
 	// is already answered. Single mode is the right call — Plan should just
 	// emit the fact as the deliverable. Bypass the gate so the rejection
 	// doesn't force a useless decompose + Execute + bash echo cycle.
-	if hasHighStrengthFact(in.Report, highConfidenceFactThreshold) {
+	if hasHighStrengthFact(in.Report, highConfidenceFactThreshold, in.Directive) {
 		return nil
 	}
 	return &StrategicPlanReject{

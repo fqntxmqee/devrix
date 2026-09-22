@@ -2,7 +2,7 @@
 demand-id: DM-20260711-001
 title: D7 Observe 节点全协议修订与实现债闭环
 priority: P1
-status: S4_InProgress
+status: S7_Archived
 dsaft_domain: orchestration
 created: 2026-07-11
 parent_change: devrix-d7-observe-llm-protocol-doc
@@ -46,7 +46,7 @@ origin: |
 
 | L3 ID | 活动 | 映射 |
 |-------|------|------|
-| D7-S5-A122 | Observe 全节点协议修订 | 本文 change |
+| D7-S5-A123 | Observe 全节点协议修订 | 本文 change |
 
 ### L4 功能点（草案）
 

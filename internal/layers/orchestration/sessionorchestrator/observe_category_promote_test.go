@@ -19,6 +19,32 @@ func TestPromoteSystemCategory_BaselineArtifactSummary(t *testing.T) {
 	}
 }
 
+func TestPromoteSystemCategory_ObservedEqualsHint(t *testing.T) {
+	payload := orchtypes.DeviationPayload{Metric: "p99", Expected: 200, Observed: 850, Delta: 650}
+	obs, err := orchtypes.NewObservation(orchtypes.ObsDeviation, orchtypes.CatBusiness, 0.9, payload, "test")
+	if err != nil {
+		t.Fatalf("NewObservation: %v", err)
+	}
+	lines := []string{"artifact_summary: latency observed=850ms"}
+	out := promoteSystemCategory([]orchtypes.Observation{obs}, lines)
+	if out[0].Category != orchtypes.CatSystem {
+		t.Fatalf("category = %s, want CatSystem for observed=", out[0].Category)
+	}
+}
+
+func TestPromoteSystemCategory_ProseObservedDoesNotPromote(t *testing.T) {
+	payload := orchtypes.DeviationPayload{Metric: "drift", Expected: 1, Observed: 2, Delta: 1}
+	obs, err := orchtypes.NewObservation(orchtypes.ObsDeviation, orchtypes.CatBusiness, 0.9, payload, "test")
+	if err != nil {
+		t.Fatalf("NewObservation: %v", err)
+	}
+	lines := []string{"artifact_summary: user observed login works"}
+	out := promoteSystemCategory([]orchtypes.Observation{obs}, lines)
+	if out[0].Category != orchtypes.CatBusiness {
+		t.Fatalf("category = %s, want CatBusiness (prose 'observed' must not promote)", out[0].Category)
+	}
+}
+
 func TestPromoteSystemCategory_NoSignalHint(t *testing.T) {
 	payload := orchtypes.DeviationPayload{Metric: "drift", Expected: 1, Observed: 2, Delta: 1}
 	obs, err := orchtypes.NewObservation(orchtypes.ObsDeviation, orchtypes.CatBusiness, 0.9, payload, "test")

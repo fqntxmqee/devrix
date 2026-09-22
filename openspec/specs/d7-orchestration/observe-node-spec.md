@@ -6,7 +6,7 @@
 **Change ID**: `devrix-d7-observe-node-spec`
 **Demand ID**: DM-20260711-001
 **Versions**: d7-orchestration v4.29.0 → v4.30.0
-**Change Package**: `openspec/changes/devrix-d7-observe-node-spec/`
+**Change Package**: `openspec/archive/2026-07-11-devrix-d7-observe-node-spec/`
 **Supersedes**: `d7-observe-llm-io-protocol-spec.md` §5 场景章节（LLM-only 叙事）
 **Complements**: `d7-observational-fastpath-spec.md`（fast-path 闸门）、`mups-frame-delta-spec.md`（Observe→Plan delta）
 **Related Demand**: DM-20260708-003（原文档）、DM-20260705-009（封闭式分类器）、DM-20260706-011（fast-path）
@@ -640,7 +640,7 @@ prior_observation_ids: obs_1, obs_2
 
 ### 8.2 P2 — CatSystem 提升 ✅
 
-**实现**：`observe_category_promote.go::promoteSystemCategory`；`mergeProposedObservations` 在 validate 后调用；`artifact_summary` 含 baseline/observed 时 ObsDeviation→CatSystem。
+**实现**：`observe_category_promote.go::promoteSystemCategory`（`WithCategory`）；`mergeProposedObservations` 在 validate 后调用；`artifact_summary` 含 `\bbaseline\b` 或 `observed=` / `observed:` 结构化 token 时 ObsDeviation→CatSystem（避免散文 “observed” 误提升）。
 
 ### 8.3 P3 — scope 双重注入 ✅
 

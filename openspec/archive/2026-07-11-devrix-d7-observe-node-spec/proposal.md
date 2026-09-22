@@ -3,7 +3,7 @@
 **Change ID:** `devrix-d7-observe-node-spec`
 **Demand ID:** DM-20260711-001
 **Priority:** P1
-**Status:** S3_Design
+**Status:** S7_Archived
 **Parent:** `devrix-d7-observe-llm-protocol-doc` (DM-20260708-003)
 
 ---

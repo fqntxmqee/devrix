@@ -445,8 +445,8 @@ func TestObserveTraceE2E_ObsSignal_StructuredMetric(t *testing.T) {
 // =============================================================================
 
 func TestObserveTraceE2E_ObsDeviation_AnomalyTrigger(t *testing.T) {
-	// 关键: LLM JSON 不指定 category,Go 强制设 CatBusiness
-	// 这里我们手改 category 为 CatSystem 来演示 anomaly 路由
+	// 关键: LLM JSON 不指定 category；Go validate 强制 CatBusiness，
+	// 再由 promoteSystemCategory 在 artifact_summary 含 baseline 时提升为 CatSystem。
 	llmRaw := `[{"kind":"obs_deviation","strength":0.9,"statement":"P99 latency","question":"","evidence":[]}]`
 
 	proposer, llm := newTraceProposer(t, llmRaw, "你是 Devrix 助手。", i18n.LocaleZH)

@@ -257,17 +257,36 @@ func TestHasHighStrengthFact(t *testing.T) {
 	repWeak, _ := orchtypes.NewUncertaintyReport("sess", []orchtypes.Observation{weakBizFact})
 	repEmpty, _ := orchtypes.NewUncertaintyReport("sess", nil)
 
-	if !hasHighStrengthFact(repBiz, 0.9) {
+	if !hasHighStrengthFact(repBiz, 0.9, "") {
 		t.Fatalf("CatBusiness ObsFact @0.99 should be high-strength, got false")
 	}
-	if hasHighStrengthFact(repSys, 0.9) {
+	if hasHighStrengthFact(repSys, 0.9, "") {
 		t.Fatalf("CatSystem ObsFact must not trigger fast-path, got true")
 	}
-	if hasHighStrengthFact(repWeak, 0.9) {
+	if hasHighStrengthFact(repWeak, 0.9, "") {
 		t.Fatalf("CatBusiness ObsFact @0.5 below threshold must not trigger fast-path")
 	}
-	if hasHighStrengthFact(repEmpty, 0.9) {
+	if hasHighStrengthFact(repEmpty, 0.9, "") {
 		t.Fatalf("empty report must not trigger fast-path")
+	}
+}
+
+func TestHasHighStrengthFact_SkipsDirectiveEcho(t *testing.T) {
+	directive := "2×3=几?"
+	echo, err := orchtypes.NewObservation(
+		orchtypes.ObsFact, orchtypes.CatBusiness, 0.95,
+		orchtypes.FactPayload{Statement: directive},
+		"item_pipeline",
+	)
+	if err != nil {
+		t.Fatalf("echo obs: %v", err)
+	}
+	rep, err := orchtypes.NewUncertaintyReport("sess_echo_gate", []orchtypes.Observation{echo})
+	if err != nil {
+		t.Fatalf("NewUncertaintyReport: %v", err)
+	}
+	if hasHighStrengthFact(rep, 0.9, directive) {
+		t.Fatal("item_pipeline directive echo must not satisfy Plan uncertainty gate")
 	}
 }
 

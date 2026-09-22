@@ -290,9 +290,10 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	//   1. !isRollup && !isDeliverableSynth && !isParentRollup
 	//   2. r.Learner != nil (Learn is the only reputation writer)
 	//   3. !hasObsUncertainty(report) — any unresolved question blocks fast-return
-	//   4. pickHighStrengthBusinessFact(report, 0.85) returns a non-empty
-	//      Statement (CatBusiness, strength ≥ 0.85 — matches
-	//      maxLLMObsFactStrength cap, so the LLM proposer can hit it
+	//   4. pickHighStrengthBusinessFact(report, 0.85, directive) returns a
+	//      non-empty Statement (CatBusiness, strength ≥ 0.85; prefers
+	//      observation_proposer over item_pipeline directive echo — matches
+	//      maxLLMObsFactStrength cap so the LLM proposer can hit it
 	//      deterministically without bypassing validation)
 	//
 	// Degradation: any gate miss → fall through to the legacy Plan+Execute

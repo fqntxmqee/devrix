@@ -2,7 +2,7 @@ change_id: devrix-d7-observe-llm-protocol-doc
 demand_id: DM-20260708-003
 title: D7 Observe ↔ LLM 5 场景输入输出协议沉淀
 priority: P1
-status: s2_proposal
+status: s7_archived
 domains: [D7]
 dsaft_scenarios:
   - D7-S5   # Observe Node (帧级 I/O 协议文档化)
@@ -35,3 +35,4 @@ notes: |
   补充。不修改任何业务代码（除 1 test 注释重编号），把散落在 6 个 Go 文件 + 1 个
   i18n 文件里的 Observe↔LLM 帧级 I/O 协议契约显式文档化。运行验证由 PR #472 的
   16 个 trace test 提供，spec doc 与 test stdout 一一对应。
+  S7_Archived 2026-07-11 with sibling observe-node-spec; superseded in part by DM-20260711-001.

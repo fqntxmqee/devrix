@@ -7,10 +7,16 @@ import (
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 )
 
-var artifactSummaryBaselinePattern = regexp.MustCompile(`(?i)baseline`)
+// Metric-pair hints on artifact_summary that justify elevating ObsDeviation
+// to CatSystem (P2). Prefer structured tokens over bare "observed" substring
+// to avoid false promotes on prose like "user observed login works".
+var (
+	artifactSummaryBaselinePattern = regexp.MustCompile(`(?i)\bbaseline\b`)
+	artifactSummaryObservedPattern = regexp.MustCompile(`(?i)\bobserved\s*[=:]`)
+)
 
 // promoteSystemCategory elevates LLM ObsDeviation rows to CatSystem when
-// inbound signals contain artifact_summary baseline/observed hints (P2 v1).
+// inbound signals contain artifact_summary baseline / observed= hints (P2 v1).
 func promoteSystemCategory(obs []orchtypes.Observation, signalLines []string) []orchtypes.Observation {
 	if len(obs) == 0 || !signalLinesHintSystemDeviation(signalLines) {
 		return obs
@@ -19,9 +25,7 @@ func promoteSystemCategory(obs []orchtypes.Observation, signalLines []string) []
 	for i, o := range obs {
 		out[i] = o
 		if o.Kind == orchtypes.ObsDeviation {
-			cp := o
-			cp.Category = orchtypes.CatSystem
-			out[i] = cp
+			out[i] = o.WithCategory(orchtypes.CatSystem)
 		}
 	}
 	return out
@@ -33,8 +37,7 @@ func signalLinesHintSystemDeviation(lines []string) bool {
 		if !strings.HasPrefix(l, SignalPrefixArtifactSummary) {
 			continue
 		}
-		lower := strings.ToLower(l)
-		if artifactSummaryBaselinePattern.MatchString(lower) || strings.Contains(lower, "observed") {
+		if artifactSummaryBaselinePattern.MatchString(l) || artifactSummaryObservedPattern.MatchString(l) {
 			return true
 		}
 	}
