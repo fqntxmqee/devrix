@@ -1426,6 +1426,44 @@ session_turn_loop.RunParallelExplore (S2-A50 LoopDepthTracker v2)
 
 ---
 
+### D7-S5-A122: Execute↔ToolRunner 4 Channel 5 场景 I/O 协议 (DM-20260708-005) — Change: `devrix-d7-execute-llm-protocol-doc` (S7_Archived)
+
+| T ID | 描述 | L4 | Evidence | Status | Priority | Tag |
+|------|------|-----|----------|--------|----------|-----|
+| **D7-S5-A122-T01** | §3 输入协议: PlanKind 4 + ChannelRequest 3 + ToolRequest 5 | `execute_toolrunner_io` | `d7-execute-toolrunner-io-protocol-spec.md` | **IMPLEMENTED** | **P0** | Execute_IO |
+| **D7-S5-A122-T02** | §4 输出协议: ArtifactKind 4 + SideEffectStatus 5 + WorkerType 3 | `execute_toolrunner_io` | `d7-execute-toolrunner-io-protocol-spec.md` | **IMPLEMENTED** | **P0** | Execute_IO |
+| **D7-S5-A122-T03..T07** | §5 场景 1–5（Commit/Protocol/Scenario/Exploration/Mixed） | `execute_toolrunner_io` | `d7-execute-toolrunner-io-protocol-spec.md` §5 | **IMPLEMENTED** | **P0** | Execute_IO |
+| **D7-S5-A122-T08..T11** | §7–§10 invariants / sideEffect / errors / test 覆盖表 | `execute_toolrunner_io` | `d7-execute-toolrunner-io-protocol-spec.md` | **IMPLEMENTED** | **P0** | Execute_IO |
+| **D7-S5-A122-T12..T16** | 5 TestExecuteTraceE2E_* | `execute_toolrunner_io` | `mups/execute/execute_trace_e2e_test.go` | **IMPLEMENTED** | **P0** | Execute_Trace |
+| **D7-S5-A122-T17..T23** | spec.md §11 + CHANGELOG + 验证 + PR #476 | — | `openspec/archive/2026-07-09-devrix-d7-execute-llm-protocol-doc/` | **IMPLEMENTED** | **P0** | Execute_Archive |
+
+**A122 Total:** 23/23 IMPLEMENTED (DM-20260708-005 S7_Archived via PR #476)
+
+---
+
+### D7-S5-A123: Observe 全节点协议 + P1–P4 实现债闭环 (DM-20260711-001) — Change: `devrix-d7-observe-node-spec` (S7_Archived)
+
+| T ID | 描述 | L4 | Evidence | Status | Priority | Tag |
+|------|------|-----|----------|--------|----------|-----|
+| **D7-S5-A123-T01** | `observe-node-spec.md` §1–§12 全节点 SoT + OBS-E/U/O + §12 反查 | `observe_node_protocol` | `openspec/specs/d7-orchestration/observe-node-spec.md` | **IMPLEMENTED** | **P0** | Observe_NodeSpec |
+| **D7-S5-A123-T02** | `d7-observe-llm-io-protocol-spec.md` Review 版重写 | `observe_node_protocol` | `openspec/specs/d7-orchestration/d7-observe-llm-io-protocol-spec.md` | **IMPLEMENTED** | **P0** | Observe_LLMI/O |
+| **D7-S5-A123-T03** | change 包 demand/proposal/design/tasks + delta spec | `observe_node_protocol` | `openspec/archive/2026-07-11-devrix-d7-observe-node-spec/` | **IMPLEMENTED** | **P0** | Observe_NodeSpec |
+| **D7-S5-A123-T04** | `spec.md` lite §12 + CHANGELOG + t-registry A123 | `observe_node_protocol` | `spec.md` + `CHANGELOG.md` + `t-registry.md` | **IMPLEMENTED** | **P0** | Observe_NodeSpec |
+| **D7-S5-A123-T05** | `pickHighStrengthBusinessFact` 两遍扫描 + directive echo 排除 | `observe_fastpath_pick` | `deliverable_execute.go` + `item_pipeline.go` | **IMPLEMENTED** | **P0** | Observe_FastPath |
+| **D7-S5-A123-T06** | 单元测试 LLM 优先于 echo | `observe_fastpath_pick` | `deliverable_execute_test.go::TestPickHighStrength_*` | **IMPLEMENTED** | **P0** | Observe_FastPath |
+| **D7-S5-A123-T07** | 集成测试 prior≥0.85 仍 emit LLM 答案 | `observe_fastpath_pick` | `item_pipeline_fastpath_test.go::TestObservationalAnswerFastPath_Prior09_EmitsLLMAnswer` | **IMPLEMENTED** | **P0** | Observe_FastPath |
+| **D7-S5-A123-T08** | U08 deliverable incomplete trace | `observe_node_merge` | `observe_trace_e2e_test.go::TestObserveTraceE2E_DeliverableIncompleteSignals` | **IMPLEMENTED** | **P0** | Observe_Mechanical |
+| **D7-S5-A123-T09** | P2 CatSystem promote（`WithCategory` + baseline/`observed=` hint） | `observe_category_promote` | `observe_category_promote.go` + `observation_proposer.go` | **IMPLEMENTED** | **P1** | Observe_Promote |
+| **D7-S5-A123-T10** | P3 scope 去重（LLM frame 省略 open questions） | `observe_llm_classifier` | `llm_observation_proposer.go` | **IMPLEMENTED** | **P1** | Observe_Scope |
+| **D7-S5-A123-T11** | P4 signal 注册表 | `observe_signal_registry` | `observe_signal_registry.go` | **IMPLEMENTED** | **P1** | Observe_Signal |
+| **D7-S5-A123-T12** | P5 observeLLMFieldMap → pt-tag 派生 | `observe_llm_classifier` | follow-up change | **DEFERRED** | **P1** | Observe_SoT |
+| **D7-S5-A123-T13** | 全量 orchestration `-race` PASS | — | 26/26 packages | **IMPLEMENTED** | **P0** | Observe_Verify |
+| **D7-S5-A123-T14** | acceptance-report + S7 归档 | — | `openspec/archive/2026-07-11-devrix-d7-observe-node-spec/` | **IMPLEMENTED** | **P0** | Observe_Archive |
+
+**A123 Total:** 13 IMPLEMENTED + 1 DEFERRED (T12 P5 pt-tag；A122 保留给 Execute DM-20260708-005)
+
+---
+
 ## D7-S16 ~ S19: TaskContract 统一 (DM-20260629-006) — DESIGN ONLY
 
 > **Change:** `devrix-d7-taskcontract-unification` (DM-20260629-006)  

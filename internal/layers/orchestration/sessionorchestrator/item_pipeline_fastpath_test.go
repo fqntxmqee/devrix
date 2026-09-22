@@ -5,6 +5,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/devrix/devrix/internal/layers/contextengine/i18n"
 	"github.com/devrix/devrix/internal/layers/orchestration/mups/learn"
 	"github.com/devrix/devrix/internal/layers/orchestration/orchtypes"
 	"github.com/devrix/devrix/internal/layers/orchestration/workmodel"
@@ -392,6 +393,44 @@ func TestObservationalAnswerFastPath_LearnerSourceIDIncludesObsID(t *testing.T) 
 	// back, which today it doesn't. So we instead verify the SourceID is
 	// reachable through the rep store row.
 	_ = learn.NewAssetBuilder() // silence unused-import linter when test run on minimal build tags
+}
+
+// DM-20260711-001: prior mean ≥ 0.85 must not cause fast-path to emit directive
+// echo when the LLM proposer returns a full answer.
+func TestObservationalAnswerFastPath_Prior09_EmitsLLMAnswer(t *testing.T) {
+	runner, tm, repStore := newItemPipelineTestRunner(t)
+	sessionID := "sess_fastpath_prior09"
+	ctx := context.Background()
+	if err := repStore.Update(ctx, &learn.ReputationEvidence{
+		SessionID: sessionID,
+		TrackMode: learn.TrackModeDeveloper,
+		Alpha:     22,
+		Beta:      0,
+	}); err != nil {
+		t.Fatalf("rep.Update: %v", err)
+	}
+
+	exec := &gateCountingExecutor{}
+	runner.Executor = exec
+	llm := &traceLLM{
+		raw: `[{"kind":"obs_fact","strength":0.85,"statement":"在标准算术下，2×3=6。","question":"","evidence":[]}]`,
+	}
+	runner.ObservationProposer = NewLLMObservationProposer(llm, &traceMUPS{systemBase: "你是 Devrix 助手。"}, i18n.LocaleZH)
+
+	goal, err := tm.EnsureGoal(sessionID, "2×3=几?")
+	if err != nil {
+		t.Fatalf("EnsureGoal: %v", err)
+	}
+	round, err := runner.Run(ctx, sessionID, goal, "u1", ItemPipelineRunOpts{})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if exec.callCount() != 0 {
+		t.Fatalf("Execute must be skipped on fast-path; got %d calls", exec.callCount())
+	}
+	if round.ArtifactSummary != "在标准算术下，2×3=6。" {
+		t.Errorf("ArtifactSummary = %q, want LLM answer not directive echo", round.ArtifactSummary)
+	}
 }
 
 // DM-20260706-011 hotfix (devrix sess_1783490448133_5000): the

@@ -257,16 +257,88 @@ func TestHasHighStrengthFact(t *testing.T) {
 	repWeak, _ := orchtypes.NewUncertaintyReport("sess", []orchtypes.Observation{weakBizFact})
 	repEmpty, _ := orchtypes.NewUncertaintyReport("sess", nil)
 
-	if !hasHighStrengthFact(repBiz, 0.9) {
+	if !hasHighStrengthFact(repBiz, 0.9, "") {
 		t.Fatalf("CatBusiness ObsFact @0.99 should be high-strength, got false")
 	}
-	if hasHighStrengthFact(repSys, 0.9) {
+	if hasHighStrengthFact(repSys, 0.9, "") {
 		t.Fatalf("CatSystem ObsFact must not trigger fast-path, got true")
 	}
-	if hasHighStrengthFact(repWeak, 0.9) {
+	if hasHighStrengthFact(repWeak, 0.9, "") {
 		t.Fatalf("CatBusiness ObsFact @0.5 below threshold must not trigger fast-path")
 	}
-	if hasHighStrengthFact(repEmpty, 0.9) {
+	if hasHighStrengthFact(repEmpty, 0.9, "") {
 		t.Fatalf("empty report must not trigger fast-path")
+	}
+}
+
+func TestHasHighStrengthFact_SkipsDirectiveEcho(t *testing.T) {
+	directive := "2×3=几?"
+	echo, err := orchtypes.NewObservation(
+		orchtypes.ObsFact, orchtypes.CatBusiness, 0.95,
+		orchtypes.FactPayload{Statement: directive},
+		"item_pipeline",
+	)
+	if err != nil {
+		t.Fatalf("echo obs: %v", err)
+	}
+	rep, err := orchtypes.NewUncertaintyReport("sess_echo_gate", []orchtypes.Observation{echo})
+	if err != nil {
+		t.Fatalf("NewUncertaintyReport: %v", err)
+	}
+	if hasHighStrengthFact(rep, 0.9, directive) {
+		t.Fatal("item_pipeline directive echo must not satisfy Plan uncertainty gate")
+	}
+}
+
+// DM-20260711-001: pickHighStrengthBusinessFact must prefer LLM ObsFact over
+// item_pipeline directive echo when both meet the strength threshold.
+func TestPickHighStrength_PrefersLLMOverDirectiveEcho(t *testing.T) {
+	directive := "2×3=几?"
+	echo, err := orchtypes.NewObservation(
+		orchtypes.ObsFact, orchtypes.CatBusiness, 0.90,
+		orchtypes.FactPayload{Statement: directive},
+		"item_pipeline",
+	)
+	if err != nil {
+		t.Fatalf("echo obs: %v", err)
+	}
+	llmFact, err := orchtypes.NewObservation(
+		orchtypes.ObsFact, orchtypes.CatBusiness, 0.85,
+		orchtypes.FactPayload{Statement: "在标准算术下，2×3=6。"},
+		llmObsProposerSource,
+	)
+	if err != nil {
+		t.Fatalf("llm obs: %v", err)
+	}
+	rep, err := orchtypes.NewUncertaintyReport("sess_pick", []orchtypes.Observation{echo, llmFact})
+	if err != nil {
+		t.Fatalf("NewUncertaintyReport: %v", err)
+	}
+
+	_, stmt, ok := pickHighStrengthBusinessFact(rep, 0.85, directive)
+	if !ok {
+		t.Fatal("expected pick to succeed")
+	}
+	if stmt != "在标准算术下，2×3=6。" {
+		t.Fatalf("stmt = %q, want LLM answer not directive echo", stmt)
+	}
+}
+
+func TestPickHighStrength_SkipsDirectiveEchoWhenNoLLMFact(t *testing.T) {
+	directive := "2×3=几?"
+	echo, err := orchtypes.NewObservation(
+		orchtypes.ObsFact, orchtypes.CatBusiness, 0.90,
+		orchtypes.FactPayload{Statement: directive},
+		"item_pipeline",
+	)
+	if err != nil {
+		t.Fatalf("echo obs: %v", err)
+	}
+	rep, err := orchtypes.NewUncertaintyReport("sess_echo_only", []orchtypes.Observation{echo})
+	if err != nil {
+		t.Fatalf("NewUncertaintyReport: %v", err)
+	}
+	if _, _, ok := pickHighStrengthBusinessFact(rep, 0.85, directive); ok {
+		t.Fatal("directive echo alone must not satisfy fast-path pick")
 	}
 }

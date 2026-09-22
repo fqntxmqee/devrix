@@ -170,17 +170,14 @@ func uncertaintyReportSummary(report orchtypes.UncertaintyReport, intentKind str
 	return strings.Join(parts, "; ")
 }
 
-// hasHighStrengthFact reports whether the report carries a CatBusiness
-// ObsFact with strength ≥ threshold. Used by the Plan single-mode gate to
-// detect "question already answered" cases (DM-20260706-009) so trivial Q&A
-// like "1+1=几?" doesn't get force-decomposed.
-func hasHighStrengthFact(report orchtypes.UncertaintyReport, threshold float64) bool {
-	for _, o := range report.Observations {
-		if o.Kind == orchtypes.ObsFact && o.Category == orchtypes.CatBusiness && o.Strength >= threshold {
-			return true
-		}
-	}
-	return false
+// hasHighStrengthFact reports whether pickHighStrengthBusinessFact would
+// succeed for the same threshold/directive. Used by the Plan single-mode
+// gate (DM-20260706-009) so trivial Q&A like "1+1=几?" doesn't get
+// force-decomposed — and so item_pipeline directive echoes are not treated
+// as answered facts (aligned with DM-20260711-001 fast-path source filter).
+func hasHighStrengthFact(report orchtypes.UncertaintyReport, threshold float64, directive string) bool {
+	_, _, ok := pickHighStrengthBusinessFact(report, threshold, directive)
+	return ok
 }
 
 // hasObsUncertainty reports whether the report carries any LLM/scoped
@@ -216,22 +213,36 @@ func hasObsUncertainty(report orchtypes.UncertaintyReport) bool {
 //
 // Returns ("", "", false) when no qualifying fact exists; callers must treat
 // the bool as the authoritative gate signal.
-func pickHighStrengthBusinessFact(report orchtypes.UncertaintyReport, threshold float64) (string, string, bool) {
-	for _, o := range report.Observations {
-		if o.Kind != orchtypes.ObsFact || o.Category != orchtypes.CatBusiness || o.Strength < threshold {
-			continue
+func pickHighStrengthBusinessFact(report orchtypes.UncertaintyReport, threshold float64, directive string) (string, string, bool) {
+	trimmedDirective := strings.TrimSpace(directive)
+	tryPick := func(preferLLM bool) (string, string, bool) {
+		for _, o := range report.Observations {
+			if o.Kind != orchtypes.ObsFact || o.Category != orchtypes.CatBusiness || o.Strength < threshold {
+				continue
+			}
+			fp, ok := o.Payload.(orchtypes.FactPayload)
+			if !ok {
+				continue
+			}
+			stmt := strings.TrimSpace(fp.Statement)
+			if stmt == "" {
+				continue
+			}
+			if preferLLM {
+				if o.Source != llmObsProposerSource {
+					continue
+				}
+			} else if o.Source == "item_pipeline" && trimmedDirective != "" && stmt == trimmedDirective {
+				continue
+			}
+			return o.ID, stmt, true
 		}
-		fp, ok := o.Payload.(orchtypes.FactPayload)
-		if !ok {
-			continue
-		}
-		stmt := strings.TrimSpace(fp.Statement)
-		if stmt == "" {
-			continue
-		}
-		return o.ID, stmt, true
+		return "", "", false
 	}
-	return "", "", false
+	if id, stmt, ok := tryPick(true); ok {
+		return id, stmt, true
+	}
+	return tryPick(false)
 }
 
 // extractObservationQuestion reads UncertaintyPayload.Question regardless

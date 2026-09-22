@@ -22,11 +22,11 @@
 
 | T ID | Status | Description | Evidence |
 |------|--------|-------------|----------|
-| D7-S6-A121-T11 | PLANNED | TestPlanTraceE2E_FrameStructure_18Fields (场景 0 输入) | `internal/layers/orchestration/sessionorchestrator/plan_trace_e2e_test.go` (NEW) |
-| D7-S6-A121-T12 | PLANNED | TestPlanTraceE2E_JSONSchema_ExecutionModeEnum (场景 0 输出) | 同上 |
-| D7-S6-A121-T13 | PLANNED | TestPlanTraceE2E_SingleMode_CommitmentPlan (场景 1) | 同上 |
-| D7-S6-A121-T14 | PLANNED | TestPlanTraceE2E_DecomposeMode_ProtocolPlan (场景 2) | 同上 |
-| D7-S6-A121-T15 | PLANNED | TestPlanTraceE2E_SingleModeFastPathBypass (场景 5 混合) | 同上 |
+| D7-S6-A121-T11 | IMPLEMENTED | TestPlanTraceE2E_FrameStructure_18Fields (场景 0 输入) | `plan_trace_e2e_test.go:136` |
+| D7-S6-A121-T12 | IMPLEMENTED | TestPlanTraceE2E_JSONSchema_ExecutionModeEnum (场景 0 输出) | `plan_trace_e2e_test.go:212` |
+| D7-S6-A121-T13 | IMPLEMENTED | TestPlanTraceE2E_SingleMode_CommitmentPlan (场景 1) | `plan_trace_e2e_test.go:276` |
+| D7-S6-A121-T14 | IMPLEMENTED | TestPlanTraceE2E_DecomposeMode_ProtocolPlan (场景 2) | `plan_trace_e2e_test.go:362` |
+| D7-S6-A121-T15 | IMPLEMENTED | TestPlanTraceE2E_SingleModeFastPathBypass (场景 5 混合) | `plan_trace_e2e_test.go:470` |
 
 > 注: 场景 3 (parallel_probe → ScenarioPlan) 和场景 4 (decompose + anomalies≥3 → ExplorationPlan) 已被 `plan_test.go::TestMatchKind_4Rules` 覆盖 (lines 306-364), 不重复添加。
 
@@ -34,9 +34,9 @@
 
 | T ID | Status | Description | Evidence |
 |------|--------|-------------|----------|
-| D7-S6-A121-T16 | PLANNED | `go test -v -run TestPlanTraceE2E ./internal/layers/orchestration/sessionorchestrator/...` 5/5 PASS | TBD |
-| D7-S6-A121-T17 | PLANNED | `go test -race ./internal/layers/orchestration/...` 22/22 packages PASS (回归) | TBD |
-| D7-S6-A121-T18 | PLANNED | `go vet ./...` 0 warning | TBD |
-| D7-S6-A121-T19 | PLANNED | PR 提交 | TBD |
+| D7-S6-A121-T16 | IMPLEMENTED | `go test -v -run TestPlanTraceE2E ./internal/layers/orchestration/sessionorchestrator/...` 5/5 PASS | 2026-07-11 race PASS |
+| D7-S6-A121-T17 | IMPLEMENTED | `go test -race ./internal/layers/orchestration/...` 26/26 packages PASS (回归) | 2026-07-11 |
+| D7-S6-A121-T18 | IMPLEMENTED | `go vet ./...` 0 warning | 2026-07-11 orchestration vet PASS |
+| D7-S6-A121-T19 | IMPLEMENTED | PR 提交 | PR #474 merged; S7 archive 2026-07-11 |
 
 **Total**: 19 T-points (10 spec sections + 5 test cases + 4 verification).

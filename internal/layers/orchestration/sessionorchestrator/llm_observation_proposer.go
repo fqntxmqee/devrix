@@ -76,9 +76,7 @@ func observeLLMFieldMap(in ObserveSignalInput) map[prompttags.TagName]any {
 	if s := strings.TrimSpace(in.ScopeGoal); s != "" {
 		m[prompttags.TagScopeGoal] = s
 	}
-	if len(in.ScopeOpenQuestions) > 0 {
-		m[prompttags.TagScopeOpenQuestion] = in.ScopeOpenQuestions
-	}
+	// P3: scope_open_question injected only by Go mapScopeContractToObservations.
 	if len(in.InboundSignalLines) > 0 {
 		m[prompttags.TagSignal] = in.InboundSignalLines
 	}

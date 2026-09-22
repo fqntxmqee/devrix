@@ -2,7 +2,7 @@ change_id: devrix-d7-plan-llm-protocol-doc
 demand_id: DM-20260708-004
 title: D7 Plan↔LLM 5 场景输入输出协议沉淀
 priority: P1
-status: s2_proposal
+status: s7_archived
 domains: [D7]
 dsaft_scenarios:
   - D7-S6   # Plan Node (StrategicPlan LLM proposer + DefaultPlanner deterministic 4 PlanKind routing)
@@ -35,3 +35,4 @@ notes: |
   3. LLM 决定 execution_mode (3 选 1), Go 端 MatchKind 决定 PlanKind (4 选 1)
   4. 混合场景: single + 高 UncertaintyMean + hasHighStrengthFact → applySingleModeUncertaintyGate bypass
   5. Plan 节点零 trace-level e2e bannered test (对比 observe 16 个), 5 test 补足
+  S7_Archived 2026-07-11 (retroactive after PR #474); packaged with observe-node-spec archive wave.

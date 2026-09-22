@@ -29,8 +29,8 @@
 
 | T ID | Status | Description | Evidence |
 |------|--------|-------------|----------|
-| D7-S5-A120-T13 | PLANNED | `go test -v -run TestObserveTraceE2E ./internal/layers/orchestration/sessionorchestrator/...` 16/16 PASS | TBD |
-| D7-S5-A120-T14 | PLANNED | `go vet ./...` 0 warning | TBD |
-| D7-S5-A120-T15 | PLANNED | PR 提交（追加到 PR #472 或新 PR） | TBD |
+| D7-S5-A120-T13 | IMPLEMENTED | `go test -v -run TestObserveTraceE2E ./internal/layers/orchestration/sessionorchestrator/...` 16/16 PASS | 2026-07-11 race PASS |
+| D7-S5-A120-T14 | IMPLEMENTED | `go vet ./...` 0 warning | 2026-07-11 orchestration vet PASS |
+| D7-S5-A120-T15 | IMPLEMENTED | PR 提交（追加到 PR #472 或新 PR） | superseded by DM-20260711-001 + S7 archive |
 
 **Total**: 15 T-points (10 spec sections + 2 test changes + 3 verification).

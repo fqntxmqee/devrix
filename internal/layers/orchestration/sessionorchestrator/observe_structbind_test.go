@@ -62,7 +62,6 @@ func TestBuildLLMObservationUserPrompt_FullInput(t *testing.T) {
 		"directive: refactor login",
 		"prior_parse_reject:",
 		"scope_goal: ship login v2",
-		"scope_open_question: q1",
 		"signal: artifact_summary: prior step ok",
 		"prior_observation_ids: obs_1,obs_2",
 	}
@@ -188,7 +187,7 @@ func TestBuildLLMObservationUserPrompt_GoldenZH(t *testing.T) {
 	}
 	body := frameBody(got)
 	frameLines := strings.Split(strings.TrimSpace(body), "\n")
-	if len(frameLines) != 5 {
-		t.Errorf("frame lines = %d, want 5:\n%s", len(frameLines), body)
+	if len(frameLines) != 4 {
+		t.Errorf("frame lines = %d, want 4 (P3: scope_open_question Go-only):\n%s", len(frameLines), body)
 	}
 }

@@ -290,16 +290,17 @@ func (r *ItemPipelineRunner) Run(ctx context.Context, sessionID string, item *wo
 	//   1. !isRollup && !isDeliverableSynth && !isParentRollup
 	//   2. r.Learner != nil (Learn is the only reputation writer)
 	//   3. !hasObsUncertainty(report) — any unresolved question blocks fast-return
-	//   4. pickHighStrengthBusinessFact(report, 0.85) returns a non-empty
-	//      Statement (CatBusiness, strength ≥ 0.85 — matches
-	//      maxLLMObsFactStrength cap, so the LLM proposer can hit it
+	//   4. pickHighStrengthBusinessFact(report, 0.85, directive) returns a
+	//      non-empty Statement (CatBusiness, strength ≥ 0.85; prefers
+	//      observation_proposer over item_pipeline directive echo — matches
+	//      maxLLMObsFactStrength cap so the LLM proposer can hit it
 	//      deterministically without bypassing validation)
 	//
 	// Degradation: any gate miss → fall through to the legacy Plan+Execute
 	// path with no error.
 	if !isRollup && !isDeliverableSynth && !isParentRollup && r.Learner != nil &&
 		!hasObsUncertainty(report) {
-		if obsID, factStmt, ok := pickHighStrengthBusinessFact(report, 0.85); ok {
+		if obsID, factStmt, ok := pickHighStrengthBusinessFact(report, 0.85, directive); ok {
 			round, fpErr := r.maybeObservationalAnswer(ctx, sessionID, item, report, obsIDs, obsID, factStmt, started, roundNo, frame.Trigger)
 			if fpErr != nil {
 				// Fast-path construction failed (e.g. tree mutation error);
