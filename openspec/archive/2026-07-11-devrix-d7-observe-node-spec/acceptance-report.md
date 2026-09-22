@@ -17,7 +17,7 @@ verdict: ACCEPTED
 | 需求 ID | DM-20260711-001 |
 | Change ID | devrix-d7-observe-node-spec |
 | Activity ID | D7-S5-A123 |
-| 总体结论 | **ACCEPTED**（P0 全绿；P1 AC5 PASS；P1 AC P5 记例外） |
+| 总体结论 | **ACCEPTED**（P0 全绿；P1 AC5 PASS；P1 AC P5 记例外；review-fix：A122→A123、归档 status、promote hint 收紧） |
 
 Wave 1–2（文档 + fast-path）与 Wave 3（P2 promote + P3 scope + P4 signal v1）已落地；P5 pt-tag 派生延后另开 change。
 
