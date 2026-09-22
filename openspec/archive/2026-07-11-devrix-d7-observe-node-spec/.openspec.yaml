@@ -29,7 +29,7 @@ supersedes_sections:
   - d7-observe-llm-io-protocol-spec.md#5
 version_scope:
   d7-orchestration: "v4.31.0 → v4.32.0"
-pr: "#478 (superseded by cursor/observe-node-spec-review-fixes)"
+pr: "#479 (supersedes #478)"
 notes: |
   S7_Archived 2026-07-11（review-fix follow-up）：P1–P4 已落地；T12 P5 pt-tag 派生
   DEFERRED。Activity 从误用的 A122 更正为 A123（A122 归 Execute DM-20260708-005）。
